@@ -1,38 +1,104 @@
 {
-  "id": "/Sl/",
-  "name": "רשימת קניות חכמה",
-  "short_name": "רשימת קניות",
-  "description": "אפליקציה פשוטה ונוחה לניהול רשימת קניות, מעקב אחר מחירים וסידור מוצרים",
-  "start_url": "/Sl/index.html",
-  "scope": "/Sl/",
+  "name": "Vplus Pro - ניהול תקציב חכם",
+  "short_name": "Vplus Pro",
+  "description": "אפליקציה מתקדמת לניהול רשימות קניות ותקציב אישי",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f7fa",
-  "theme_color": "#6366f1",
+  "background_color": "#7367f0",
+  "theme_color": "#7367f0",
   "orientation": "portrait",
-  "dir": "rtl",
-  "lang": "he",
-  "categories": ["shopping", "productivity", "lifestyle"],
+  "scope": "/",
   "icons": [
     {
-      "src": "icon.png",
-      "sizes": "1024x1024",
+      "src": "/icon-72.png",
+      "sizes": "72x72",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "icon.png",
-      "sizes": "1024x1024",
+      "src": "/icon-96.png",
+      "sizes": "96x96",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "icon.png",
-      "sizes": "1024x1024",
+      "src": "/screenshot1.png",
+      "sizes": "540x720",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "מסך ראשי של אפליקציית רשימת קניות"
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot2.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
-  ]
+  ],
+  "categories": ["finance", "productivity", "shopping"],
+  "shortcuts": [
+    {
+      "name": "רשימה חדשה",
+      "short_name": "חדש",
+      "description": "צור רשימת קניות חדשה",
+      "url": "/?action=new",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "סטטיסטיקות",
+      "short_name": "סטטיסטיקות",
+      "description": "צפה בסטטיסטיקות הוצאות",
+      "url": "/?action=stats",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
 }
