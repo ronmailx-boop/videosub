@@ -159,6 +159,46 @@
     background: var(--panel-2); color: var(--muted); border:1px solid var(--line);
   }
   .badge.gpu{ color:#0f1115; background: var(--ok); border-color:var(--ok); }
+
+  .fs-toggle-btn{
+    position:absolute; top:10px; left:10px; z-index:20;
+    width:36px;height:36px;border-radius:50%;
+    background: rgba(15,17,21,.6); border:1px solid rgba(255,255,255,.15);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+
+  .video-wrap.fs-active{
+    position:fixed; inset:0; z-index:9999;
+    background:#000; border-radius:0;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .video-wrap.fs-active video{
+    width:100%; height:100%;
+    object-fit:contain;
+    touch-action:none;
+    border-radius:0;
+    will-change: transform;
+  }
+  .video-wrap.fs-active .fs-toggle-btn{ display:none; }
+
+  .fs-controls{
+    position:absolute; bottom:0; left:0; right:0; z-index:10000;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0,0,0,.65));
+  }
+  .fs-btn{
+    background: rgba(255,255,255,.14); border:none; color:#fff;
+    width:46px; height:46px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:19px; cursor:pointer;
+  }
+  .fs-zoom-label{
+    color:#fff; font-size:13px; background:rgba(255,255,255,.14);
+    padding:6px 12px; border-radius:20px;
+  }
 </style>
 </head>
 <body>
@@ -208,11 +248,19 @@
 </div>
 
 <div class="card hidden" id="playerCard">
-  <div class="video-wrap">
+  <div class="video-wrap" id="videoWrap">
     <video id="video" controls playsinline></video>
     <div class="buffer-overlay hidden" id="bufferOverlay">
       <div class="spinner"></div>
       <div id="bufferText">מכין את הכתובית הבאה...</div>
+    </div>
+    <button class="fs-toggle-btn" id="fsToggleBtn" title="מסך מלא">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+    <div class="fs-controls hidden" id="fsControls">
+      <button class="fs-btn" id="fsExitBtn" title="יציאה ממסך מלא">✕</button>
+      <span class="fs-zoom-label hidden" id="fsZoomLabel">100%</span>
+      <button class="fs-btn hidden" id="fsResetZoomBtn" title="חזרה ל-100%">1:1</button>
     </div>
   </div>
   <div class="bg-status">
@@ -494,6 +542,136 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+// ---- Fullscreen + pinch-to-zoom + one-finger pan ----
+const videoWrap = document.getElementById('videoWrap');
+const fsToggleBtn = document.getElementById('fsToggleBtn');
+const fsExitBtn = document.getElementById('fsExitBtn');
+const fsControls = document.getElementById('fsControls');
+const fsZoomLabel = document.getElementById('fsZoomLabel');
+const fsResetZoomBtn = document.getElementById('fsResetZoomBtn');
+
+const MIN_SCALE = 1, MAX_SCALE = 4;
+let scale = 1, panX = 0, panY = 0;
+let pinchStartDist = 0, pinchStartScale = 1;
+let panStartX = 0, panStartY = 0, panOriginX = 0, panOriginY = 0;
+let isPanning = false;
+
+function applyTransform() {
+  video.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  const pct = Math.round(scale * 100);
+  fsZoomLabel.textContent = pct + '%';
+  if (scale > 1.02) {
+    fsZoomLabel.classList.remove('hidden');
+    fsResetZoomBtn.classList.remove('hidden');
+  } else {
+    fsZoomLabel.classList.add('hidden');
+    fsResetZoomBtn.classList.add('hidden');
+  }
+}
+
+function clampPan() {
+  const rect = videoWrap.getBoundingClientRect();
+  const maxX = Math.max(0, (rect.width * (scale - 1)) / 2);
+  const maxY = Math.max(0, (rect.height * (scale - 1)) / 2);
+  panX = Math.min(maxX, Math.max(-maxX, panX));
+  panY = Math.min(maxY, Math.max(-maxY, panY));
+}
+
+function resetZoom() {
+  scale = 1; panX = 0; panY = 0;
+  video.style.transition = 'transform .2s ease';
+  applyTransform();
+  setTimeout(() => { video.style.transition = ''; }, 220);
+}
+
+function dist(t1, t2) {
+  return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+}
+
+async function enterFullscreen() {
+  videoWrap.classList.add('fs-active');
+  fsControls.classList.remove('hidden');
+  video.removeAttribute('controls');
+  try {
+    if (videoWrap.requestFullscreen) await videoWrap.requestFullscreen();
+    else if (videoWrap.webkitRequestFullscreen) videoWrap.webkitRequestFullscreen();
+  } catch (e) { console.warn('Fullscreen request failed', e); }
+}
+
+function exitFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+  leaveFullscreenUI();
+}
+
+function leaveFullscreenUI() {
+  videoWrap.classList.remove('fs-active');
+  fsControls.classList.add('hidden');
+  video.setAttribute('controls', '');
+  resetZoom();
+}
+
+fsToggleBtn.addEventListener('click', enterFullscreen);
+fsExitBtn.addEventListener('click', exitFullscreen);
+fsResetZoomBtn.addEventListener('click', resetZoom);
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && videoWrap.classList.contains('fs-active')) {
+    leaveFullscreenUI();
+  }
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  if (!document.webkitFullscreenElement && videoWrap.classList.contains('fs-active')) {
+    leaveFullscreenUI();
+  }
+});
+
+video.addEventListener('touchstart', (e) => {
+  if (!videoWrap.classList.contains('fs-active')) return;
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    pinchStartDist = dist(e.touches[0], e.touches[1]);
+    pinchStartScale = scale;
+    isPanning = false;
+  } else if (e.touches.length === 1 && scale > 1) {
+    e.preventDefault();
+    isPanning = true;
+    panStartX = e.touches[0].clientX;
+    panStartY = e.touches[0].clientY;
+    panOriginX = panX;
+    panOriginY = panY;
+  }
+}, { passive: false });
+
+video.addEventListener('touchmove', (e) => {
+  if (!videoWrap.classList.contains('fs-active')) return;
+  if (e.touches.length === 2 && pinchStartDist > 0) {
+    e.preventDefault();
+    const newDist = dist(e.touches[0], e.touches[1]);
+    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, pinchStartScale * (newDist / pinchStartDist)));
+    clampPan();
+    applyTransform();
+  } else if (e.touches.length === 1 && isPanning) {
+    e.preventDefault();
+    panX = panOriginX + (e.touches[0].clientX - panStartX);
+    panY = panOriginY + (e.touches[0].clientY - panStartY);
+    clampPan();
+    applyTransform();
+  }
+}, { passive: false });
+
+video.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0) {
+    isPanning = false;
+    pinchStartDist = 0;
+    if (scale <= 1.02) resetZoom();
+  }
+});
+
 </script>
 </body>
 </html>
