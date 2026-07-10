@@ -1,571 +1,499 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vplus Pro - ניהול תקציב חכם</title>
-    <meta name="theme-color" content="#7367f0">
-    <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    
-    <style>
-        * { box-sizing: border-box; touch-action: manipulation; }
-        body { 
-            font-family: system-ui, sans-serif; 
-            background: linear-gradient(135deg, #f4f7fa 0%, #e8ecf3 100%); 
-            padding-bottom: 240px; 
-            min-height: 100vh; 
-            transition: background 0.3s; 
-            margin: 0; 
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>כתוביות AI - תרגום וידאו לעברית</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1115">
+<style>
+  :root{
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f232c;
+    --line: #2a2f3a;
+    --text: #eef0f4;
+    --muted: #8b93a3;
+    --accent: #3ba7ff;
+    --accent-2: #ffb454;
+    --ok: #4fd08a;
+    --err: #ff6b6b;
+    --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew", Arial, sans-serif;
+    min-height:100vh;
+    padding: 18px 14px 40px;
+    direction: rtl;
+  }
+  header{
+    display:flex; align-items:center; gap:12px; margin-bottom:18px;
+  }
+  .logo{
+    width:38px;height:38px;border-radius:10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700; color:#0f1115; font-size:18px; flex-shrink:0;
+  }
+  h1{font-size:17px; margin:0; font-weight:700;}
+  .sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
 
-        .item-card { 
-            background: white; 
-            border-radius: 25px; 
-            padding: 15px; 
-            margin-bottom: 12px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.03); 
-            display: flex; 
-            flex-direction: column;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
+  .card{
+    background: var(--panel);
+    border:1px solid var(--line);
+    border-radius: var(--radius);
+    padding:16px;
+    margin-bottom:14px;
+  }
 
-        .item-card:active {
-            transform: scale(0.98);
-        }
+  .dropzone{
+    border:2px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 28px 16px;
+    text-align:center;
+    color: var(--muted);
+    cursor:pointer;
+    transition: border-color .15s;
+  }
+  .dropzone:active{ border-color: var(--accent); }
+  .dropzone svg{ margin-bottom:8px; }
+  .dropzone strong{ color: var(--text); display:block; margin-bottom:4px; font-size:15px;}
+  input[type=file]{ display:none; }
 
-        .item-number { color: #7367f0; opacity: 0.6; font-size: 0.8em; margin-left: 4px; }
+  select, button{
+    font-family:inherit;
+    font-size:14.5px;
+  }
+  .row{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .row:last-child{ margin-bottom:0; }
+  .row label{ color:var(--muted); font-size:13.5px; }
+  select{
+    background: var(--panel-2);
+    color: var(--text);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:8px 10px;
+  }
 
-        #searchInput { 
-            transition: all 0.3s ease; 
-            border: 2px solid transparent; 
-        }
-        #searchInput:focus { 
-            border-color: #7367f0; 
-            background: #fff; 
-            box-shadow: 0 10px 25px rgba(115, 103, 240, 0.1); 
-            outline: none; 
-        }
+  button.primary{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:12px;
+    background: var(--accent);
+    color:#08131f;
+    font-weight:700;
+    font-size:15.5px;
+    cursor:pointer;
+  }
+  button.primary:disabled{ background: var(--panel-2); color: var(--muted); }
+  button.secondary{
+    background:none; border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:8px 14px; cursor:pointer;
+  }
 
-        .bottom-bar { 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            right: 0; 
-            background: linear-gradient(135deg, #7367f0 0%, #9055ff 100%);
-            z-index: 1000; 
-            padding: 15px 15px 35px 15px; 
-            border-radius: 35px 35px 0 0; 
-            box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.15); 
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+  .status-line{
+    display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--muted);
+    margin-bottom:8px;
+  }
+  .status-line .dot{ width:7px;height:7px;border-radius:50%; background:var(--line); flex-shrink:0; }
+  .status-line.active .dot{ background: var(--accent); box-shadow:0 0 0 4px rgba(59,167,255,.15); }
+  .status-line.done .dot{ background: var(--ok); }
+  .status-line.error .dot{ background: var(--err); }
+  .status-line.active{ color: var(--text); }
 
-        .bottom-bar.minimized {
-            transform: translateY(calc(100% - 8px));
-        }
+  .bar{
+    height:6px; background: var(--panel-2); border-radius:6px; overflow:hidden; margin-top:4px;
+  }
+  .bar > div{ height:100%; background: var(--accent); width:0%; transition: width .2s; }
 
-        .tab-btn { 
-            flex: 1; 
-            padding: 12px; 
-            border-radius: 15px; 
-            font-weight: bold; 
-            text-align: center; 
-            cursor: pointer; 
-            transition: 0.2s; 
-            background: white; 
-            color: #666; 
-            border: 1px solid #eee; 
-        }
-        .tab-active { 
-            background: linear-gradient(135deg, #7367f0 0%, #9055ff 100%) !important; 
-            color: white !important; 
-            box-shadow: 0 4px 12px rgba(115, 103, 240, 0.3);
-        }
+  video{
+    width:100%;
+    border-radius: var(--radius);
+    background:#000;
+    display:block;
+  }
+  video::cue{
+    font-size: 1.15rem;
+    direction: rtl;
+    unicode-bidi: plaintext;
+    line-height:1.4;
+    background: rgba(0,0,0,.6);
+    font-family: "Arial Hebrew","Noto Sans Hebrew",-apple-system,Arial,sans-serif;
+  }
 
-        .bottom-circle-btn {
-            width: 48px !important;
-            height: 48px !important;
-            flex-shrink: 0 !important;
-            border-radius: 50% !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            border: 2px solid rgba(255,255,255,0.2) !important;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
+  .hidden{ display:none !important; }
+  .note{ font-size:12px; color:var(--muted); line-height:1.6; margin-top:10px; }
+  .filename{ font-size:13px; color: var(--text); margin-top:10px; word-break:break-all;}
 
-        .bottom-circle-btn:active {
-            transform: scale(0.95);
-        }
+  .video-wrap{ position:relative; }
+  .buffer-overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    background: rgba(10,12,16,.72);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size:14px;
+    text-align:center;
+    padding:20px;
+  }
+  .spinner{
+    width:26px;height:26px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.2);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
 
-        .modal-overlay { 
-            display: none; 
-            position: fixed; 
-            inset: 0; 
-            background: rgba(0,0,0,0.75); 
-            z-index: 7000; 
-            align-items: flex-start; 
-            justify-content: center; 
-            backdrop-filter: blur(8px); 
-            padding-top: 0; 
-        }
-        .modal-overlay.active { display: flex; }
-
-        .edit-modal { 
-            width: 90%; 
-            max-width: 400px; 
-            background-color: #ffffff !important; 
-            border-radius: 0 0 30px 30px; 
-            padding: 6px 25px; 
-            text-align: center; 
-            color: #333; 
-            border: 2px solid #eee; 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-input { 
-            width: 100%; 
-            padding: 6px; 
-            border: 2px solid #f3f4f6; 
-            border-radius: 16px; 
-            font-size: 16px; 
-            text-align: center; 
-            outline: none; 
-            margin-bottom: 5px; 
-            font-weight: bold; 
-            background: #f9fafb !important; 
-            color: #333; 
-        }
-
-        .edit-modal h2 {
-            margin-top: 2px;
-            margin-bottom: 8px;
-            font-size: 1.15rem;
-        }
-
-        .app-header { 
-            background: white; 
-            padding: 10px 20px; 
-            display: flex; 
-            flex-direction: row-reverse; 
-            justify-content: space-between; 
-            align-items: center; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
-            position: sticky; 
-            top: 0; 
-            z-index: 2000; 
-            height: 60px; 
-        }
-        .header-controls { display: flex; align-items: center; gap: 8px; direction: rtl; }
-        .gear-btn { flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
-
-        .trash-btn { 
-            width: 44px; 
-            height: 44px; 
-            background: white; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            color: #ef4444; 
-            border: none; 
-            cursor: pointer; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
-        }
-        .category-separator { 
-            background: linear-gradient(135deg, #7367f0 0%, #9055ff 100%); 
-            color: white; 
-            border-radius: 20px; 
-            padding: 15px; 
-            margin-bottom: 20px; 
-            text-align: center; 
-        }
-
-        .category-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: bold;
-            margin: 2px;
-        }
-
-        .stat-card {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 15px;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 8px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
-            border-radius: 10px;
-            transition: width 0.3s ease;
-        }
-
-        body.dark-mode { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #e0e0e0; }
-        .dark-mode .app-header { background: #16213e; border-bottom: 1px solid #0f3460; }
-        .dark-mode .item-card, .dark-mode .bg-white, .dark-mode .stat-card { background-color: #0f3460 !important; border-color: #1a1a2e; color: white; }
-        .dark-mode #selectAllLabel { color: white !important; }
-        .dark-mode .select-all-container { background-color: #0f3460 !important; }
-        .dark-mode #searchInput { background-color: #0f3460 !important; color: white; }
-        .dark-mode .item-number { color: #a5a2f7; }
-        .dark-mode .item-card span.font-bold { color: white !important; }
-        .dark-mode .item-card .bg-gray-50 { background-color: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.2); }
-        .dark-mode .modal-input { background-color: #0f3460 !important; color: white !important; border-color: #1a1a2e; }
-        .dark-mode .edit-modal { background-color: #16213e !important; color: white; border-color: #0f3460; }
-
-        @media print {
-            .no-print, .bottom-bar, .app-header, .tab-btn, .modal-overlay, .trash-btn, input, button { display: none !important; }
-            #printArea { display: block !important; width: 100%; direction: rtl; }
-        }
-
-        .notification {
-            position: fixed;
-            top: 70px;
-            right: 20px;
-            background: white;
-            padding: 15px 20px;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            z-index: 9000;
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-
-        .template-badge {
-            background: #fbbf24;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 8px;
-            font-size: 10px;
-            font-weight: bold;
-            margin-right: 8px;
-        }
-    </style>
-    
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker Registered'))
-            .catch(err => console.log('Registration Failed', err));
-        });
-      }
-
-      // Auto dark mode based on system preference
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.addEventListener('DOMContentLoaded', () => {
-          const savedDarkMode = localStorage.getItem('darkMode');
-          if (savedDarkMode === null) {
-            document.body.classList.add('dark-mode');
-          }
-        });
-      }
-    </script>
+  .bg-status{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12.5px; color:var(--muted); margin-top:10px;
+  }
+  .bg-status .bar{ flex:1; margin-right:10px; }
+  .badge{
+    font-size:11px; padding:2px 8px; border-radius:20px;
+    background: var(--panel-2); color: var(--muted); border:1px solid var(--line);
+  }
+  .badge.gpu{ color:#0f1115; background: var(--ok); border-color:var(--ok); }
+</style>
 </head>
 <body>
 
-    <div class="app-header no-print">
-        <h1 class="font-bold text-2xl" style="direction: ltr;">
-            <span style="color: #22c55e !important;">V</span>
-            <span class="text-indigo-600">plus</span>
-            <span style="font-size: 10px; color: #9055ff; vertical-align: super;">PRO</span>
-        </h1>
-        
-        <div class="header-controls">
-            <div id="cloudBtn" class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold border border-indigo-100 flex items-center gap-1 cursor-pointer">
-                <span>סנכרון ענן</span>
-                <div id="cloudIndicator" class="w-2 h-2 bg-gray-300 rounded-full"></div>
-            </div>
-            
-            <div class="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center bg-white shadow-sm cursor-pointer overflow-hidden">
-                <svg class="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .67-2.28 1.07-3.71 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.11c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.09H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.91l3.66-2.8z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.09l3.66 2.84c.87-2.6 3.3-4.55 6.16-4.55z"/>
-                </svg>
-            </div>
+<header>
+  <div class="logo">כת</div>
+  <div>
+    <h1>כתוביות AI</h1>
+    <div class="sub">תרגום אנגלית ← עברית, מקומי בדפדפן</div>
+  </div>
+</header>
 
-            <button onclick="openModal('settingsModal')" class="p-2 rounded-full hover:bg-gray-100 gear-btn">
-                <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            </button>
-        </div>
+<div class="card" id="uploadCard">
+  <div class="dropzone" id="dropzone">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8b93a3" stroke-width="1.6"><path d="M12 3v12m0-12 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    <strong>לחץ לבחירת קובץ וידאו</strong>
+    <span>MP4, MOV או כל פורמט וידאו מהטלפון</span>
+  </div>
+  <input type="file" id="fileInput" accept="video/*">
+  <div class="filename hidden" id="filename"></div>
+</div>
+
+<div class="card" id="optionsCard">
+  <div class="row">
+    <label>דיוק תמלול</label>
+    <select id="modelSelect">
+      <option value="Xenova/whisper-tiny.en">מהיר (דיוק בסיסי)</option>
+      <option value="Xenova/whisper-base.en" selected>מאוזן (מומלץ)</option>
+      <option value="Xenova/whisper-small.en">מדויק (איטי יותר)</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>אורך קטע לעיבוד</label>
+    <select id="chunkSelect">
+      <option value="20">20 שנ' (כתוביות קצרות)</option>
+      <option value="30" selected>30 שנ' (מומלץ)</option>
+    </select>
+  </div>
+</div>
+
+<button class="primary" id="startBtn" disabled>בחר סרטון כדי להתחיל</button>
+
+<div class="card hidden" id="progressCard" style="margin-top:14px;">
+  <div class="status-line" id="s1"><div class="dot"></div><div>טוען מודל תמלול (הורדה חד-פעמית)</div></div>
+  <div class="bar"><div id="p1"></div></div>
+  <div class="status-line" id="s2" style="margin-top:14px;"><div class="dot"></div><div>מחלץ ומעבד אודיו</div></div>
+</div>
+
+<div class="card hidden" id="playerCard">
+  <div class="video-wrap">
+    <video id="video" controls playsinline></video>
+    <div class="buffer-overlay hidden" id="bufferOverlay">
+      <div class="spinner"></div>
+      <div id="bufferText">מכין את הכתובית הבאה...</div>
     </div>
+  </div>
+  <div class="bg-status">
+    <span id="bgStatusText">מעבד קדימה: 0/0 קטעים</span>
+    <span class="badge" id="gpuBadge">CPU</span>
+  </div>
+  <div class="bar"><div id="p3"></div></div>
+  <div class="row" style="margin-top:12px;">
+    <button class="secondary" id="downloadVtt">הורד קובץ כתוביות (VTT)</button>
+    <button class="secondary" id="resetBtn">סרטון חדש</button>
+  </div>
+</div>
 
-    <div class="max-w-md mx-auto p-4 no-print">
-        <div class="flex gap-3 mb-6">
-            <div id="tabLists" onclick="showPage('lists')" class="tab-btn">הרשימה שלי</div>
-            <div id="tabSummary" onclick="showPage('summary')" class="tab-btn">הרשימות שלי</div>
-            <div id="tabStats" onclick="showPage('stats')" class="tab-btn">📊 סטטיסטיקות</div>
-        </div>
+<div class="note">
+  הכל קורה בתוך הדפדפן: הווידאו לא עולה לשום שרת. התמלול (Whisper) רץ מקומית על הטלפון - ומואץ אוטומטית
+  דרך WebGPU אם הדפדפן תומך בזה (יופיע תג "GPU" ליד הנגן). הצפייה מתחילה כמעט מיד: הנגן מעבד קדימה ברקע,
+  ורק עוצר לרגע אם הצפייה "משיגה" קטע שעוד לא תורגם - ואז ממשיך אוטומטית כשמוכן.
+  התרגום לעברית משתמש ב-Google Translate. בפעם הראשונה יש הורדה של מודל התמלול (כמה עשרות MB) - מומלץ ברשת WiFi.
+</div>
 
-        <div id="pageLists">
-            <div class="lists-header-card bg-white p-2 rounded-2xl border border-gray-100 shadow-sm mb-4">
-                <div class="flex gap-2">
-                    <button onclick="openModal('newListModal')" class="bg-indigo-600 text-white flex-1 py-3 rounded-xl font-bold">+ רשימה חדשה</button>
-                    <button onclick="openModal('importModal')" class="bg-green-500 text-white flex-1 py-3 rounded-xl font-bold">📥 ייבוא</button>
-                </div>
-            </div>
-            <div class="category-separator">
-                <div class="flex justify-between items-center px-2">
-                    <button onclick="shareNative('list')" class="text-white opacity-90">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
-                    </button>
-                    <div class="flex-1 text-center">
-                        <div id="listNameDisplay" class="text-2xl font-black truncate" onclick="openModal('editListNameModal')"></div>
-                        <div id="itemCountDisplay" class="text-[10px] font-bold opacity-80 uppercase tracking-wider mt-0.5">0 מוצרים</div>
-                    </div>
-                    <button onclick="toggleTemplateMode()" class="text-white opacity-90">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                    </button>
-                </div>
-                <div id="statusTag" class="text-[10px] font-bold mt-2 opacity-80 text-center">נעול</div>
-                <div id="budgetWarning" class="hidden text-[10px] font-bold mt-2 bg-red-500 text-white py-1 px-3 rounded-full inline-block">⚠️ חריגה מתקציב!</div>
-            </div>
-            <div id="itemsContainer"></div>
-        </div>
+<script type="module">
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
 
-        <div id="pageSummary" class="hidden">
-            <div class="mb-4 relative">
-                <input type="text" id="searchInput" oninput="render()" placeholder="חפש רשימה, מוצר או לינק..." class="w-full p-4 pr-12 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500 text-lg">
-                <svg class="w-6 h-6 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            </div>
+env.allowLocalModels = false;
+env.useBrowserCache = true;
 
-            <div class="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100 flex items-center gap-3 select-all-container">
-                <input type="checkbox" id="selectAllLists" onchange="toggleSelectAll(this.checked)" class="w-7 h-7 accent-indigo-600">
-                <span id="selectAllLabel" class="font-bold text-slate-700 text-lg flex-1">בחר את כל הרשימות</span>
-                <button onclick="shareNative('summary')" class="text-indigo-600">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
-                </button>
-            </div>
-            <div id="summaryContainer"></div>
-        </div>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const filenameEl = document.getElementById('filename');
+const startBtn = document.getElementById('startBtn');
+const modelSelect = document.getElementById('modelSelect');
+const chunkSelect = document.getElementById('chunkSelect');
 
-        <div id="pageStats" class="hidden">
-            <div class="stat-card">
-                <h3 class="text-xl font-bold mb-4">📊 סטטיסטיקות חודשיות</h3>
-                <div class="mb-4">
-                    <div class="flex justify-between mb-2">
-                        <span class="font-bold">הוצאות החודש</span>
-                        <span class="text-indigo-600 font-black" id="monthlyTotal">₪0.00</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="monthlyProgress" style="width: 0%"></div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-green-50 p-3 rounded-xl">
-                        <div class="text-xs text-green-600 mb-1">רשימות הושלמו</div>
-                        <div class="text-2xl font-black text-green-600" id="completedLists">0</div>
-                    </div>
-                    <div class="bg-blue-50 p-3 rounded-xl">
-                        <div class="text-xs text-blue-600 mb-1">ממוצע לרשימה</div>
-                        <div class="text-2xl font-black text-blue-600" id="avgPerList">₪0</div>
-                    </div>
-                </div>
-                <canvas id="monthlyChart" height="200"></canvas>
-            </div>
+const progressCard = document.getElementById('progressCard');
+const s1 = document.getElementById('s1'), p1 = document.getElementById('p1');
+const s2 = document.getElementById('s2');
 
-            <div class="stat-card">
-                <h3 class="text-xl font-bold mb-4">🏆 מוצרים פופולריים</h3>
-                <div id="popularItems"></div>
-            </div>
+const playerCard = document.getElementById('playerCard');
+const video = document.getElementById('video');
+const bufferOverlay = document.getElementById('bufferOverlay');
+const bufferText = document.getElementById('bufferText');
+const bgStatusText = document.getElementById('bgStatusText');
+const gpuBadge = document.getElementById('gpuBadge');
+const p3 = document.getElementById('p3');
+const downloadVttBtn = document.getElementById('downloadVtt');
+const resetBtn = document.getElementById('resetBtn');
 
-            <div class="stat-card">
-                <h3 class="text-xl font-bold mb-4">📁 היסטוריה</h3>
-                <button onclick="openModal('historyModal')" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">
-                    צפה ברשימות שהושלמו
-                </button>
-            </div>
-        </div>
-    </div>
+let selectedFile = null;
+let lastVttText = '';
+let processedUntilSec = 0;
+let processingDone = false;
+let waitingForTranscript = false;
 
-    <div class="bottom-bar text-white no-print">
-        <div class="flex items-center justify-between mb-4">
-            <div class="flex-1 text-center"><div class="text-[10px] opacity-70">סה"כ רשימה</div><div class="text-xl font-bold">₪<span id="displayTotal">0.00</span></div></div>
-            <div class="flex-shrink-0"><button onclick="openModal('inputForm')" class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-white/20 text-white text-4xl font-bold">+</button></div>
-            <div class="flex-1 text-center"><div class="text-[10px] opacity-70">שולם ברשימה</div><div class="text-xl font-bold">₪<span id="displayPaid">0.00</span></div></div>
-        </div>
-        <div class="flex items-center justify-between gap-4">
-            <button id="mainLockBtn" onclick="toggleLock()" class="bottom-circle-btn bg-blue-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path id="lockIconPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-            </button>
-            <div class="text-center flex-1">
-                <div class="text-[10px] opacity-70">נשאר לשלם</div>
-                <div class="text-2xl font-black text-orange-300">₪<span id="displayLeft">0.00</span></div>
-            </div>
-            <button onclick="openModal('confirmModal')" class="bottom-circle-btn bg-red-500">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-            </button>
-        </div>
-    </div>
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files[0]) {
+    selectedFile = fileInput.files[0];
+    filenameEl.textContent = '📹 ' + selectedFile.name;
+    filenameEl.classList.remove('hidden');
+    startBtn.disabled = false;
+    startBtn.textContent = 'התחל תמלול ותרגום';
+  }
+});
 
-    <div id="printArea" class="hidden"></div>
+resetBtn.addEventListener('click', () => location.reload());
 
-    <!-- Modals -->
-    <div id="inputForm" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>הוספת מוצר</h2>
-            <input type="text" id="itemName" placeholder="שם המוצר" class="modal-input">
-            <input type="number" id="itemPrice" inputmode="decimal" placeholder="מחיר" class="modal-input">
-            <select id="itemCategory" class="modal-input">
-                <option value="">בחר קטגוריה (אופציונלי)</option>
-                <option value="פירות וירקות">🥬 פירות וירקות</option>
-                <option value="בשר ודגים">🥩 בשר ודגים</option>
-                <option value="חלב וביצים">🥛 חלב וביצים</option>
-                <option value="לחם ומאפים">🍞 לחם ומאפים</option>
-                <option value="שימורים">🥫 שימורים</option>
-                <option value="חטיפים">🍪 חטיפים</option>
-                <option value="משקאות">🥤 משקאות</option>
-                <option value="ניקיון">🧹 ניקיון</option>
-                <option value="היגיינה">🧴 היגיינה</option>
-                <option value="אחר">📦 אחר</option>
-            </select>
-            <div class="flex gap-3">
-                <button class="bg-green-500 text-white flex-1 py-4 rounded-xl font-bold shadow-md" onclick="addItem()">הוסף</button>
-                <button class="bg-gray-100 text-gray-500 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('inputForm')">ביטול</button>
-            </div>
-        </div>
-    </div>
+async function trySharedFile() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('shared') !== '1') return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const cache = await caches.open('vsub-shared-file-v1');
+    const res = await cache.match('/shared-video');
+    if (!res) return;
+    const blob = await res.blob();
+    await cache.delete('/shared-video');
+    selectedFile = new File([blob], 'סרטון משותף', { type: blob.type || 'video/mp4' });
+    filenameEl.textContent = '📹 סרטון שהתקבל משיתוף';
+    filenameEl.classList.remove('hidden');
+    startBtn.disabled = false;
+    startBtn.textContent = 'התחל תמלול ותרגום';
+  } catch (e) {
+    console.error('Could not load shared file', e);
+  }
+}
+trySharedFile();
 
-    <div id="importModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2 class="mb-2">ייבוא רשימה מטקסט</h2>
-            <p class="text-sm text-gray-500 mb-4">הדבק טקסט מוואטסאפ או כל רשימה</p>
-            <textarea id="importText" placeholder="הדבק כאן טקסט לייבוא..." class="modal-input" rows="8" style="resize: vertical; min-height: 150px;"></textarea>
-            <div class="flex gap-3">
-                <button class="bg-green-500 text-white flex-1 py-4 rounded-xl font-bold shadow-md" onclick="importFromText()">ייבא</button>
-                <button class="bg-gray-100 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('importModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+function setStatus(el, state) {
+  el.classList.remove('active', 'done', 'error');
+  if (state) el.classList.add(state);
+}
 
-    <div id="newListModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>רשימה חדשה</h2>
-            <input type="text" id="newListNameInput" placeholder="שם הרשימה" class="modal-input">
-            <input type="url" id="newListUrlInput" placeholder="כתובת אתר (אופציונלי)" class="modal-input">
-            <input type="number" id="newListBudget" placeholder="תקציב (אופציונלי)" class="modal-input">
-            <div class="flex items-center justify-center gap-2 mb-3">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" id="newListTemplate" class="w-5 h-5 accent-indigo-600">
-                    <span class="text-sm font-bold">⭐ שמור כתבנית</span>
-                </label>
-            </div>
-            <div class="flex gap-3">
-                <button class="bg-indigo-600 text-white flex-1 py-4 rounded-xl font-bold shadow-md" onclick="saveNewList()">צור</button>
-                <button class="bg-gray-100 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('newListModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+function toVttTime(sec) {
+  sec = Math.max(0, sec);
+  const h = Math.floor(sec / 3600).toString().padStart(2, '0');
+  const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+  const s = Math.floor(sec % 60).toString().padStart(2, '0');
+  const ms = Math.floor((sec % 1) * 1000).toString().padStart(3, '0');
+  return `${h}:${m}:${s}.${ms}`;
+}
 
-    <div id="confirmModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2 class="text-green-600">סיום רשימה</h2>
-            <p class="mb-6">לסמן רשימה זו כהושלמה ולשמור בהיסטוריה?</p>
-            <div class="flex gap-3">
-                <button class="bg-green-500 text-white flex-1 py-4 rounded-xl font-bold shadow-lg" onclick="completeList()">השלם</button>
-                <button class="bg-gray-100 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('confirmModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+async function decodeAndResample(arrayBuffer) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+  const targetRate = 16000;
+  const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * targetRate), targetRate);
+  const source = offline.createBufferSource();
+  source.buffer = decoded;
+  source.connect(offline.destination);
+  source.start(0);
+  const rendered = await offline.startRendering();
+  audioCtx.close();
+  return { samples: rendered.getChannelData(0), duration: decoded.duration, sampleRate: targetRate };
+}
 
-    <div id="deleteListModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2 class="text-red-600">מחיקת רשימה</h2>
-            <div class="flex gap-3">
-                <button id="confirmDeleteListBtn" class="bg-red-500 text-white flex-1 py-4 rounded-xl font-bold" onclick="deleteFullList()">מחק</button>
-                <button class="bg-gray-100 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('deleteListModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+async function translateToHebrew(text) {
+  if (!text || !text.trim()) return '';
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=iw&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data[0].map(part => part[0]).join('');
+  } catch (e) {
+    console.error('Translate failed', e);
+    return text; // fallback: show English if translation fails
+  }
+}
 
-    <div id="editListNameModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>עריכת רשימה</h2>
-            <input type="text" id="editListNameInput" placeholder="שם הרשימה" class="modal-input">
-            <input type="url" id="editListUrlInput" placeholder="כתובת אתר (אופציונלי)" class="modal-input">
-            <input type="number" id="editListBudget" placeholder="תקציב (אופציונלי)" class="modal-input">
-            <div class="flex gap-3">
-                <button class="bg-indigo-600 text-white flex-1 py-4 rounded-xl font-bold" onclick="saveListName()">שמור</button>
-                <button class="bg-gray-100 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('editListNameModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+async function loadTranscriber(modelName, onProgress) {
+  const opts = {
+    progress_callback: (data) => {
+      if (data.status === 'progress' && data.total) {
+        onProgress(Math.round((data.loaded / data.total) * 100));
+      }
+    }
+  };
+  // Try WebGPU first for a big speed boost on supported phones/browsers.
+  if (navigator.gpu) {
+    try {
+      const t = await pipeline('automatic-speech-recognition', modelName, { ...opts, device: 'webgpu' });
+      gpuBadge.textContent = 'GPU (מואץ)';
+      gpuBadge.classList.add('gpu');
+      return t;
+    } catch (e) {
+      console.warn('WebGPU pipeline failed, falling back to CPU/WASM', e);
+    }
+  }
+  const t = await pipeline('automatic-speech-recognition', modelName, opts);
+  gpuBadge.textContent = 'CPU';
+  return t;
+}
 
-    <div id="editTotalModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>עדכון מחיר</h2>
-            <input type="number" id="editTotalInput" class="modal-input">
-            <div class="flex gap-3">
-                <button class="bg-indigo-600 text-white flex-1 py-4 rounded-xl font-bold" onclick="saveTotal()">עדכן</button>
-                <button class="bg-gray-100 flex-1 py-4 rounded-xl font-bold" onclick="closeModal('editTotalModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+function showBuffering(msg) {
+  waitingForTranscript = true;
+  bufferText.textContent = msg || 'מכין את הכתובית הבאה...';
+  bufferOverlay.classList.remove('hidden');
+  video.pause();
+}
 
-    <div id="historyModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>📁 היסטוריית רכישות</h2>
-            <div id="historyContent" style="max-height: 400px; overflow-y: auto;"></div>
-            <button onclick="closeModal('historyModal')" class="mt-4 text-gray-400 block w-full">סגור</button>
-        </div>
-    </div>
+function hideBuffering() {
+  waitingForTranscript = false;
+  bufferOverlay.classList.add('hidden');
+}
 
-    <div id="templatesModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>⭐ תבניות רשימות</h2>
-            <div id="templatesContent" style="max-height: 400px; overflow-y: auto;"></div>
-            <button onclick="closeModal('templatesModal')" class="mt-4 text-gray-400 block w-full">סגור</button>
-        </div>
-    </div>
+startBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  startBtn.disabled = true;
+  document.getElementById('uploadCard').classList.add('hidden');
+  document.getElementById('optionsCard').classList.add('hidden');
+  startBtn.classList.add('hidden');
+  progressCard.classList.remove('hidden');
 
-    <div id="settingsModal" class="modal-overlay no-print">
-        <div class="edit-modal">
-            <h2>הגדרות</h2>
-            <button onclick="toggleDarkMode()" class="w-full bg-indigo-50 text-indigo-600 py-4 rounded-xl font-bold mb-3">
-                <span id="darkModeText">מצב לילה 🌙</span>
-            </button>
-            <button onclick="openModal('templatesModal'); closeModal('settingsModal')" class="w-full bg-yellow-50 text-yellow-600 py-4 rounded-xl font-bold mb-3">
-                ⭐ תבניות שמורות
-            </button>
-            <button onclick="preparePrint()" class="w-full bg-orange-500 text-white py-4 rounded-xl font-bold mb-3">
-                הדפס PDF 🖨️
-            </button>
-            <button onclick="exportData()" class="w-full bg-blue-500 text-white py-4 rounded-xl font-bold mb-3">
-                💾 גיבוי נתונים
-            </button>
-            <button onclick="document.getElementById('importDataFile').click()" class="w-full bg-purple-500 text-white py-4 rounded-xl font-bold mb-3">
-                📂 שחזר נתונים
-            </button>
-            <input type="file" id="importDataFile" accept=".json" style="display: none;" onchange="importData(event)">
-            <button onclick="closeModal('settingsModal')" class="mt-4 text-gray-400 block w-full">סגור</button>
-        </div>
-    </div>
+  try {
+    // Load model + decode audio in parallel so first frame arrives sooner.
+    setStatus(s1, 'active');
+    setStatus(s2, 'active');
+    const modelName = modelSelect.value;
 
-    <script src="script.js"></script>
+    const [transcriber, audioData] = await Promise.all([
+      loadTranscriber(modelName, (pct) => { p1.style.width = pct + '%'; }),
+      selectedFile.arrayBuffer().then(decodeAndResample)
+    ]);
+    setStatus(s1, 'done');
+    setStatus(s2, 'done');
+
+    const { samples, sampleRate } = audioData;
+
+    // Attach video immediately - playback can start right away.
+    const track = video.addTextTrack('subtitles', 'עברית', 'he');
+    track.mode = 'showing';
+    video.src = URL.createObjectURL(selectedFile);
+
+    progressCard.classList.add('hidden');
+    playerCard.classList.remove('hidden');
+    showBuffering('מכין את הכתובית הראשונה...');
+
+    // Pause playback automatically if the viewer catches up to un-translated audio.
+    video.addEventListener('timeupdate', () => {
+      if (processingDone) return;
+      if (!waitingForTranscript && video.currentTime >= processedUntilSec - 0.4) {
+        showBuffering();
+      }
+    });
+    video.addEventListener('seeking', () => {
+      if (!processingDone && video.currentTime > processedUntilSec - 0.4) {
+        showBuffering('מכין כתובית לנקודה הזו...');
+      }
+    });
+
+    // Background chunked transcription + translation loop.
+    const chunkSec = parseFloat(chunkSelect.value);
+    const chunkSamples = Math.floor(chunkSec * sampleRate);
+    const totalChunks = Math.max(1, Math.ceil(samples.length / chunkSamples));
+
+    let vtt = 'WEBVTT\n\n';
+    let cueIndex = 1;
+
+    for (let i = 0; i < totalChunks; i++) {
+      const startSample = i * chunkSamples;
+      const endSample = Math.min(samples.length, startSample + chunkSamples);
+      const chunkAudio = samples.subarray(startSample, endSample);
+      const chunkStartTime = startSample / sampleRate;
+      const chunkEndTime = endSample / sampleRate;
+
+      bgStatusText.textContent = `מעבד קדימה: ${i + 1}/${totalChunks} קטעים`;
+
+      let result;
+      try {
+        result = await transcriber(chunkAudio, { chunk_length_s: chunkSec, stride_length_s: 3 });
+      } catch (e) {
+        console.error('Transcribe chunk failed', e);
+        processedUntilSec = chunkEndTime;
+        p3.style.width = Math.round(((i + 1) / totalChunks) * 100) + '%';
+        continue;
+      }
+
+      const text = (result && result.text) ? result.text.trim() : '';
+      if (text) {
+        const hebrew = await translateToHebrew(text);
+        track.addCue(new VTTCue(chunkStartTime, chunkEndTime, hebrew));
+        vtt += `${cueIndex}\n${toVttTime(chunkStartTime)} --> ${toVttTime(chunkEndTime)}\n${hebrew}\n\n`;
+        cueIndex++;
+      }
+
+      processedUntilSec = chunkEndTime;
+      p3.style.width = Math.round(((i + 1) / totalChunks) * 100) + '%';
+
+      // If the viewer was waiting on exactly this chunk, let them continue.
+      if (waitingForTranscript && video.currentTime < processedUntilSec - 0.4) {
+        hideBuffering();
+        video.play().catch(() => {});
+      }
+    }
+
+    processingDone = true;
+    lastVttText = vtt;
+    if (waitingForTranscript) {
+      hideBuffering();
+      video.play().catch(() => {});
+    }
+    bgStatusText.textContent = `הושלם - ${totalChunks}/${totalChunks} קטעים`;
+
+  } catch (err) {
+    console.error(err);
+    bgStatusText.textContent = 'שגיאה: ' + (err.message || 'משהו השתבש. נסה סרטון אחר או מודל מהיר יותר.');
+  }
+});
+
+downloadVttBtn.addEventListener('click', () => {
+  const blob = new Blob([lastVttText], { type: 'text/vtt' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'subtitles-he.vtt';
+  a.click();
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
 </body>
 </html>

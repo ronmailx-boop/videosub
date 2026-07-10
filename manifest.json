@@ -1,104 +1,36 @@
 {
-  "name": "Vplus Pro - ניהול תקציב חכם",
-  "short_name": "Vplus Pro",
-  "description": "אפליקציה מתקדמת לניהול רשימות קניות ותקציב אישי",
-  "start_url": "/",
+  "name": "כתוביות AI - תרגום וידאו לעברית",
+  "short_name": "כתוביות AI",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#7367f0",
-  "theme_color": "#7367f0",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "dir": "rtl",
+  "lang": "he",
   "orientation": "portrait",
-  "scope": "/",
   "icons": [
     {
-      "src": "/icon-72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
-      "src": "/icon-384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshot1.png",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow"
-    },
-    {
-      "src": "/screenshot2.png",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
-  "categories": ["finance", "productivity", "shopping"],
-  "shortcuts": [
-    {
-      "name": "רשימה חדשה",
-      "short_name": "חדש",
-      "description": "צור רשימת קניות חדשה",
-      "url": "/?action=new",
-      "icons": [
+  "share_target": {
+    "action": "./index.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
         {
-          "src": "/icon-96.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "סטטיסטיקות",
-      "short_name": "סטטיסטיקות",
-      "description": "צפה בסטטיסטיקות הוצאות",
-      "url": "/?action=stats",
-      "icons": [
-        {
-          "src": "/icon-96.png",
-          "sizes": "96x96"
+          "name": "video",
+          "accept": ["video/*", ".mp4", ".mov", ".mkv", ".webm", ".3gp"]
         }
       ]
     }
-  ],
-  "prefer_related_applications": false,
-  "related_applications": []
+  }
 }
