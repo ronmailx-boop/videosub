@@ -214,6 +214,8 @@
     display:flex; align-items:center; justify-content:center;
     font-size:19px; cursor:pointer;
   }
+  .fs-btn#fsSubtitlesBtn{ font-size:13px; font-weight:700; }
+  .fs-btn.off{ opacity:.4; }
   .fs-zoom-label{
     color:#fff; font-size:13px; background:rgba(255,255,255,.14);
     padding:6px 12px; border-radius:20px;
@@ -286,6 +288,7 @@
         <div class="fs-buttons-right">
           <button class="fs-btn" id="fsExitBtn" title="יציאה ממסך מלא">✕</button>
           <button class="fs-btn" id="fsPlayPauseBtn" title="נגן/השהה">⏸</button>
+          <button class="fs-btn" id="fsSubtitlesBtn" title="כתוביות">CC</button>
         </div>
         <div class="fs-buttons-left">
           <span class="fs-zoom-label hidden" id="fsZoomLabel">100%</span>
@@ -342,6 +345,7 @@ const resetBtn = document.getElementById('resetBtn');
 let selectedFile = null;
 let lastVttText = '';
 let processedUntilSec = 0;
+let currentTrack = null;
 let processingDone = false;
 let waitingForTranscript = false;
 
@@ -481,6 +485,7 @@ startBtn.addEventListener('click', async () => {
 
     // Attach video immediately - playback can start right away.
     const track = video.addTextTrack('subtitles', 'עברית', 'he');
+    currentTrack = track;
     track.mode = 'showing';
     video.src = URL.createObjectURL(selectedFile);
 
@@ -582,6 +587,7 @@ const fsControls = document.getElementById('fsControls');
 const fsZoomLabel = document.getElementById('fsZoomLabel');
 const fsResetZoomBtn = document.getElementById('fsResetZoomBtn');
 const fsPlayPauseBtn = document.getElementById('fsPlayPauseBtn');
+const fsSubtitlesBtn = document.getElementById('fsSubtitlesBtn');
 const fsSeekBar = document.getElementById('fsSeekBar');
 const fsCurrentTime = document.getElementById('fsCurrentTime');
 const fsDuration = document.getElementById('fsDuration');
@@ -610,6 +616,17 @@ video.addEventListener('pause', () => { fsPlayPauseBtn.textContent = '▶'; });
 fsPlayPauseBtn.addEventListener('click', () => {
   if (video.paused) video.play().catch(() => {});
   else video.pause();
+});
+
+fsSubtitlesBtn.addEventListener('click', () => {
+  if (!currentTrack) return;
+  if (currentTrack.mode === 'showing') {
+    currentTrack.mode = 'hidden';
+    fsSubtitlesBtn.classList.add('off');
+  } else {
+    currentTrack.mode = 'showing';
+    fsSubtitlesBtn.classList.remove('off');
+  }
 });
 
 fsSeekBar.addEventListener('input', () => {
