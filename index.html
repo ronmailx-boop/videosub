@@ -185,10 +185,29 @@
 
   .fs-controls{
     position:absolute; bottom:0; left:0; right:0; z-index:10000;
-    display:flex; align-items:center; justify-content:space-between;
-    padding:14px 18px calc(14px + env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, rgba(0,0,0,.65));
+    display:flex; flex-direction:column; gap:8px;
+    padding:10px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0,0,0,.7));
   }
+  .fs-seek-row{
+    display:flex; align-items:center; gap:8px;
+    direction:ltr;
+  }
+  .fs-time{ color:#fff; font-size:12px; min-width:38px; text-align:center; }
+  .fs-seek{
+    flex:1; -webkit-appearance:none; appearance:none;
+    height:4px; border-radius:4px; background: rgba(255,255,255,.28);
+    outline:none;
+  }
+  .fs-seek::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:15px; height:15px; border-radius:50%;
+    background:#fff; cursor:pointer;
+  }
+  .fs-buttons-row{
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .fs-buttons-left, .fs-buttons-right{ display:flex; align-items:center; gap:10px; }
   .fs-btn{
     background: rgba(255,255,255,.14); border:none; color:#fff;
     width:46px; height:46px; border-radius:50%;
@@ -258,9 +277,21 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
     <div class="fs-controls hidden" id="fsControls">
-      <button class="fs-btn" id="fsExitBtn" title="יציאה ממסך מלא">✕</button>
-      <span class="fs-zoom-label hidden" id="fsZoomLabel">100%</span>
-      <button class="fs-btn hidden" id="fsResetZoomBtn" title="חזרה ל-100%">1:1</button>
+      <div class="fs-seek-row">
+        <span class="fs-time" id="fsCurrentTime">0:00</span>
+        <input type="range" class="fs-seek" id="fsSeekBar" min="0" max="100" value="0" step="0.1">
+        <span class="fs-time" id="fsDuration">0:00</span>
+      </div>
+      <div class="fs-buttons-row">
+        <div class="fs-buttons-right">
+          <button class="fs-btn" id="fsExitBtn" title="יציאה ממסך מלא">✕</button>
+          <button class="fs-btn" id="fsPlayPauseBtn" title="נגן/השהה">⏸</button>
+        </div>
+        <div class="fs-buttons-left">
+          <span class="fs-zoom-label hidden" id="fsZoomLabel">100%</span>
+          <button class="fs-btn hidden" id="fsResetZoomBtn" title="חזרה ל-100%">1:1</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="bg-status">
@@ -550,6 +581,50 @@ const fsExitBtn = document.getElementById('fsExitBtn');
 const fsControls = document.getElementById('fsControls');
 const fsZoomLabel = document.getElementById('fsZoomLabel');
 const fsResetZoomBtn = document.getElementById('fsResetZoomBtn');
+const fsPlayPauseBtn = document.getElementById('fsPlayPauseBtn');
+const fsSeekBar = document.getElementById('fsSeekBar');
+const fsCurrentTime = document.getElementById('fsCurrentTime');
+const fsDuration = document.getElementById('fsDuration');
+
+function formatTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+let seekBarDragging = false;
+
+video.addEventListener('loadedmetadata', () => {
+  fsDuration.textContent = formatTime(video.duration);
+});
+video.addEventListener('timeupdate', () => {
+  fsCurrentTime.textContent = formatTime(video.currentTime);
+  if (!seekBarDragging && video.duration) {
+    fsSeekBar.value = (video.currentTime / video.duration) * 100;
+  }
+});
+video.addEventListener('play', () => { fsPlayPauseBtn.textContent = '⏸'; });
+video.addEventListener('pause', () => { fsPlayPauseBtn.textContent = '▶'; });
+
+fsPlayPauseBtn.addEventListener('click', () => {
+  if (video.paused) video.play().catch(() => {});
+  else video.pause();
+});
+
+fsSeekBar.addEventListener('input', () => {
+  seekBarDragging = true;
+  if (video.duration) {
+    const t = (fsSeekBar.value / 100) * video.duration;
+    fsCurrentTime.textContent = formatTime(t);
+  }
+});
+fsSeekBar.addEventListener('change', () => {
+  if (video.duration) {
+    video.currentTime = (fsSeekBar.value / 100) * video.duration;
+  }
+  seekBarDragging = false;
+});
 
 const MIN_SCALE = 1, MAX_SCALE = 4;
 let scale = 1, panX = 0, panY = 0;
