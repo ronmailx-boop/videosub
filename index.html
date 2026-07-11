@@ -222,6 +222,7 @@
   }
   .fs-btn#fsSubtitlesBtn{ font-size:13px; font-weight:700; }
   .fs-btn.off{ opacity:.4; }
+  .fs-btn-text{ font-size:14px; font-weight:700; width:40px; height:40px; }
   .fs-zoom-label{
     color:#fff; font-size:13px; background:rgba(255,255,255,.14);
     padding:6px 12px; border-radius:20px;
@@ -300,6 +301,8 @@
           </button>
         </div>
         <div class="fs-buttons-left">
+          <button class="fs-btn fs-btn-text" id="fsTextSizeMinusBtn" title="הקטן טקסט כתוביות">א-</button>
+          <button class="fs-btn fs-btn-text" id="fsTextSizePlusBtn" title="הגדל טקסט כתוביות">א+</button>
           <span class="fs-zoom-label hidden" id="fsZoomLabel">100%</span>
           <button class="fs-btn hidden" id="fsResetZoomBtn" title="חזרה ל-100%">1:1</button>
         </div>
@@ -595,6 +598,8 @@ const fsExitBtn = document.getElementById('fsExitBtn');
 const fsControls = document.getElementById('fsControls');
 const fsZoomLabel = document.getElementById('fsZoomLabel');
 const fsResetZoomBtn = document.getElementById('fsResetZoomBtn');
+const fsTextSizeMinusBtn = document.getElementById('fsTextSizeMinusBtn');
+const fsTextSizePlusBtn = document.getElementById('fsTextSizePlusBtn');
 const fsPlayPauseBtn = document.getElementById('fsPlayPauseBtn');
 const fsSubtitlesBtn = document.getElementById('fsSubtitlesBtn');
 const fsRotateBtn = document.getElementById('fsRotateBtn');
@@ -769,6 +774,24 @@ function leaveFullscreenUI() {
 fsToggleBtn.addEventListener('click', enterFullscreen);
 fsExitBtn.addEventListener('click', exitFullscreen);
 fsResetZoomBtn.addEventListener('click', resetZoom);
+
+// ---- Subtitle text size control ----
+let subtitleFontSize = 1.15; // rem, matches the default video::cue rule
+const cueStyleEl = document.createElement('style');
+document.head.appendChild(cueStyleEl);
+function updateCueFontSize() {
+  cueStyleEl.textContent = `video::cue{ font-size:${subtitleFontSize}rem !important; }`;
+}
+updateCueFontSize();
+
+fsTextSizePlusBtn.addEventListener('click', () => {
+  subtitleFontSize = Math.min(2.4, +(subtitleFontSize + 0.15).toFixed(2));
+  updateCueFontSize();
+});
+fsTextSizeMinusBtn.addEventListener('click', () => {
+  subtitleFontSize = Math.max(0.7, +(subtitleFontSize - 0.15).toFixed(2));
+  updateCueFontSize();
+});
 
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && videoWrap.classList.contains('fs-active')) {
