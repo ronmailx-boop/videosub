@@ -38,7 +38,12 @@ async function handleShareTarget(event) {
       const cache = await caches.open(SHARED_FILE_CACHE);
       await cache.put(
         '/shared-video',
-        new Response(file, { headers: { 'Content-Type': file.type || 'video/mp4' } })
+        new Response(file, {
+          headers: {
+            'Content-Type': file.type || 'video/mp4',
+            'X-Original-Filename': encodeURIComponent(file.name || 'video.mp4')
+          }
+        })
       );
     }
   } catch (e) {

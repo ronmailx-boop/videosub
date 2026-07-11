@@ -199,6 +199,12 @@
     display:flex; align-items:center; gap:8px;
     direction:ltr;
   }
+  .fs-filename{
+    color:#fff; font-size:12px; opacity:.85;
+    text-align:center; direction:rtl;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    padding:0 4px;
+  }
   .fs-time{ color:#fff; font-size:12px; min-width:38px; text-align:center; }
   .fs-seek{
     flex:1; -webkit-appearance:none; appearance:none;
@@ -276,6 +282,7 @@
 </div>
 
 <div class="card hidden" id="playerCard">
+  <div class="filename" id="playerFilename" style="margin-top:0; margin-bottom:10px;"></div>
   <div class="video-wrap" id="videoWrap">
     <video id="video" controls playsinline></video>
     <div class="buffer-overlay hidden" id="bufferOverlay">
@@ -286,6 +293,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
     <div class="fs-controls hidden" id="fsControls">
+      <div class="fs-filename" id="fsFilename"></div>
       <div class="fs-seek-row">
         <span class="fs-time" id="fsCurrentTime">0:00</span>
         <input type="range" class="fs-seek" id="fsSeekBar" min="0" max="100" value="0" step="0.1">
@@ -382,10 +390,12 @@ async function trySharedFile() {
     const cache = await caches.open('vsub-shared-file-v1');
     const res = await cache.match('/shared-video');
     if (!res) return;
+    const rawName = res.headers.get('X-Original-Filename');
+    const originalName = rawName ? decodeURIComponent(rawName) : 'סרטון משותף';
     const blob = await res.blob();
     await cache.delete('/shared-video');
-    selectedFile = new File([blob], 'סרטון משותף', { type: blob.type || 'video/mp4' });
-    filenameEl.textContent = '📹 סרטון שהתקבל משיתוף';
+    selectedFile = new File([blob], originalName, { type: blob.type || 'video/mp4' });
+    filenameEl.textContent = '📹 ' + originalName;
     filenameEl.classList.remove('hidden');
     startBtn.disabled = false;
     startBtn.textContent = 'התחל תמלול ותרגום';
@@ -503,6 +513,8 @@ startBtn.addEventListener('click', async () => {
 
     progressCard.classList.add('hidden');
     playerCard.classList.remove('hidden');
+    document.getElementById('playerFilename').textContent = '📹 ' + selectedFile.name;
+    document.getElementById('fsFilename').textContent = selectedFile.name;
     showBuffering('מכין את הכתובית הראשונה...');
 
     // Pause playback automatically if the viewer catches up to un-translated audio.
