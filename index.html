@@ -174,6 +174,12 @@
     display:flex; align-items:center; justify-content:center;
     overflow:hidden;
   }
+  .video-wrap.fs-active.fs-force-landscape{
+    top:50%; left:50%; right:auto; bottom:auto;
+    width:100vh; height:100vw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
   .video-wrap.fs-active video{
     width:100%; height:100%;
     object-fit:contain;
@@ -260,7 +266,7 @@
     <strong>לחץ לבחירת קובץ וידאו</strong>
     <span>MP4, MOV או כל פורמט וידאו מהטלפון</span>
   </div>
-  <input type="file" id="fileInput" accept="video/*">
+  <input type="file" id="fileInput">
   <div class="filename hidden" id="filename"></div>
 </div>
 
@@ -380,10 +386,27 @@ let currentTrack = null;
 let processingDone = false;
 let waitingForTranscript = false;
 
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.avi', '.webm', '.3gp', '.flv', '.wmv', '.m4v', '.ts'];
+
+function looksLikeVideo(file) {
+  if (file.type && file.type.startsWith('video/')) return true;
+  const lowerName = file.name.toLowerCase();
+  return VIDEO_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+}
+
 dropzone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
   if (fileInput.files && fileInput.files[0]) {
-    selectedFile = fileInput.files[0];
+    const file = fileInput.files[0];
+    if (!looksLikeVideo(file)) {
+      filenameEl.textContent = '⚠️ הקובץ שנבחר לא נראה כקובץ וידאו - בחר קובץ MP4/MOV/MKV וכו\'';
+      filenameEl.classList.remove('hidden');
+      startBtn.disabled = true;
+      startBtn.textContent = 'בחר סרטון כדי להתחיל';
+      selectedFile = null;
+      return;
+    }
+    selectedFile = file;
     filenameEl.textContent = '📹 ' + selectedFile.name;
     filenameEl.classList.remove('hidden');
     startBtn.disabled = false;
@@ -669,6 +692,7 @@ fsSubtitlesBtn.addEventListener('click', () => {
   }
 });
 
+let forcedLandscape = false;
 fsRotateBtn.addEventListener('click', async () => {
   try {
     const current = (screen.orientation && screen.orientation.type) || '';
@@ -678,7 +702,10 @@ fsRotateBtn.addEventListener('click', async () => {
       await screen.orientation.lock('landscape');
     }
   } catch (e) {
-    console.warn('Orientation lock not supported/allowed', e);
+    // Native orientation lock generally requires true native fullscreen, which we
+    // deliberately avoid (see enterFullscreen). Fall back to a visual CSS rotation.
+    forcedLandscape = !forcedLandscape;
+    videoWrap.classList.toggle('fs-force-landscape', forcedLandscape);
   }
 });
 
@@ -766,16 +793,16 @@ video.addEventListener('play', () => { if (videoWrap.classList.contains('fs-acti
 fsControls.addEventListener('touchstart', () => showFsControls());
 fsControls.addEventListener('click', () => showFsControls());
 
-async function enterFullscreen() {
+function enterFullscreen() {
   videoWrap.classList.add('fs-active');
   fsControls.classList.remove('hidden');
   fsTopBar.classList.remove('hidden');
   video.removeAttribute('controls');
   showFsControls();
-  try {
-    if (videoWrap.requestFullscreen) await videoWrap.requestFullscreen();
-    else if (videoWrap.webkitRequestFullscreen) videoWrap.webkitRequestFullscreen();
-  } catch (e) { console.warn('Fullscreen request failed', e); }
+  // Note: intentionally NOT using the native Fullscreen API (requestFullscreen).
+  // On some Android/Chrome launch contexts (e.g. opening the app after a Share
+  // Target hand-off) it causes the video to render as a black screen. Our own
+  // CSS-based full-viewport layout below gives the same visual result reliably.
 }
 
 function exitFullscreen() {
@@ -789,6 +816,8 @@ function exitFullscreen() {
 
 function leaveFullscreenUI() {
   videoWrap.classList.remove('fs-active');
+  videoWrap.classList.remove('fs-force-landscape');
+  forcedLandscape = false;
   fsControls.classList.add('hidden');
   fsControls.classList.remove('fs-hidden');
   fsTopBar.classList.add('hidden');
@@ -833,14 +862,11 @@ fsTextSizeMinusBtn.addEventListener('click', () => {
   updateCueFontSize();
 });
 
+// Kept as a safety net in case a future browser version does honor a native
+// fullscreen request triggered elsewhere - exits our UI cleanly if that happens.
 document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && videoWrap.classList.contains('fs-active')) {
-    leaveFullscreenUI();
-  }
-});
-document.addEventListener('webkitfullscreenchange', () => {
-  if (!document.webkitFullscreenElement && videoWrap.classList.contains('fs-active')) {
-    leaveFullscreenUI();
+  if (!document.fullscreenElement && videoWrap.classList.contains('fs-active') && document.fullscreenElement !== videoWrap) {
+    // no-op: we no longer request native fullscreen ourselves
   }
 });
 
