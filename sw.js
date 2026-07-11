@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vsub-shell-v1';
+const CACHE_NAME = 'vsub-shell-v2';
 const SHARED_FILE_CACHE = 'vsub-shared-file-v1';
 const SHELL_FILES = ['./index.html', './manifest.json'];
 
@@ -10,7 +10,15 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((names) =>
+      Promise.all(
+        names
+          .filter((name) => name !== CACHE_NAME && name !== SHARED_FILE_CACHE)
+          .map((name) => caches.delete(name))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
@@ -22,10 +30,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Serve the app shell from cache; everything else (CDN models, translate API) goes to network.
-  if (url.origin === self.location.origin) {
+  // App shell: always prefer a fresh copy from the network so updates show up
+  // immediately; only fall back to the cached copy if there's no connection.
+  if (url.origin === self.location.origin && event.request.method === 'GET') {
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
+      fetch(event.request)
+        .then((res) => {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
     );
   }
 });
