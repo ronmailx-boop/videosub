@@ -183,6 +183,21 @@
   }
   .video-wrap.fs-active .fs-toggle-btn{ display:none; }
 
+  .fs-top-bar{
+    position:absolute; top:0; left:0; right:0; z-index:10000;
+    padding: calc(10px + env(safe-area-inset-top)) 16px 24px;
+    background: linear-gradient(rgba(0,0,0,.65), transparent);
+    transition: opacity .25s ease;
+    opacity:1;
+    text-align:center;
+  }
+  .fs-top-bar.fs-hidden{ opacity:0; pointer-events:none; }
+  .fs-top-bar span{
+    color:#fff; font-size:12.5px; opacity:.9;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    display:block; direction:rtl;
+  }
+
   .fs-controls{
     position:absolute; bottom:0; left:0; right:0; z-index:10000;
     display:flex; flex-direction:column; gap:8px;
@@ -198,12 +213,6 @@
   .fs-seek-row{
     display:flex; align-items:center; gap:8px;
     direction:ltr;
-  }
-  .fs-filename{
-    color:#fff; font-size:12px; opacity:.85;
-    text-align:center; direction:rtl;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    padding:0 4px;
   }
   .fs-time{ color:#fff; font-size:12px; min-width:38px; text-align:center; }
   .fs-seek{
@@ -292,8 +301,10 @@
     <button class="fs-toggle-btn" id="fsToggleBtn" title="מסך מלא">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
+    <div class="fs-top-bar hidden" id="fsTopBar">
+      <span id="fsFilenameTop"></span>
+    </div>
     <div class="fs-controls hidden" id="fsControls">
-      <div class="fs-filename" id="fsFilename"></div>
       <div class="fs-seek-row">
         <span class="fs-time" id="fsCurrentTime">0:00</span>
         <input type="range" class="fs-seek" id="fsSeekBar" min="0" max="100" value="0" step="0.1">
@@ -514,7 +525,7 @@ startBtn.addEventListener('click', async () => {
     progressCard.classList.add('hidden');
     playerCard.classList.remove('hidden');
     document.getElementById('playerFilename').textContent = '📹 ' + selectedFile.name;
-    document.getElementById('fsFilename').textContent = selectedFile.name;
+    document.getElementById('fsFilenameTop').textContent = selectedFile.name;
     showBuffering('מכין את הכתובית הראשונה...');
 
     // Pause playback automatically if the viewer catches up to un-translated audio.
@@ -608,6 +619,8 @@ const videoWrap = document.getElementById('videoWrap');
 const fsToggleBtn = document.getElementById('fsToggleBtn');
 const fsExitBtn = document.getElementById('fsExitBtn');
 const fsControls = document.getElementById('fsControls');
+const fsTopBar = document.getElementById('fsTopBar');
+const fsFilenameTop = document.getElementById('fsFilenameTop');
 const fsZoomLabel = document.getElementById('fsZoomLabel');
 const fsResetZoomBtn = document.getElementById('fsResetZoomBtn');
 const fsTextSizeMinusBtn = document.getElementById('fsTextSizeMinusBtn');
@@ -727,11 +740,13 @@ let hideControlsTimer = null;
 
 function showFsControls() {
   fsControls.classList.remove('fs-hidden');
+  fsTopBar.classList.remove('fs-hidden');
   scheduleHideControls();
 }
 
 function hideFsControlsNow() {
   fsControls.classList.add('fs-hidden');
+  fsTopBar.classList.add('fs-hidden');
 }
 
 function scheduleHideControls() {
@@ -754,6 +769,7 @@ fsControls.addEventListener('click', () => showFsControls());
 async function enterFullscreen() {
   videoWrap.classList.add('fs-active');
   fsControls.classList.remove('hidden');
+  fsTopBar.classList.remove('hidden');
   video.removeAttribute('controls');
   showFsControls();
   try {
@@ -775,6 +791,8 @@ function leaveFullscreenUI() {
   videoWrap.classList.remove('fs-active');
   fsControls.classList.add('hidden');
   fsControls.classList.remove('fs-hidden');
+  fsTopBar.classList.add('hidden');
+  fsTopBar.classList.remove('fs-hidden');
   clearTimeout(hideControlsTimer);
   video.setAttribute('controls', '');
   resetZoom();
