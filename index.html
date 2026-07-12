@@ -420,20 +420,22 @@ let showingOriginal = false;
 let subtitlesEnabled = true; // single source of truth for whether captions should be visible
 
 // Chrome sometimes only applies ::cue style/text changes to the *next* cue, not the
-// one currently on screen. Forcing the track off and back on again fixes that.
-// IMPORTANT: several controls (CC toggle, EN/HE toggle, font size +/-) all need this
-// same refresh, so they must share ONE implementation that always restores the
-// single `subtitlesEnabled` intent - not whatever `currentTrack.mode` happened to be
-// at the moment of the click. Reading `currentTrack.mode` as "the value to restore"
-// is what caused the buttons to occasionally stop responding: if two of these
-// controls were tapped in quick succession, each captured the other's in-flight
-// "hidden" state as its own "previous" value, and the caption could end up stuck.
+// one currently on screen. The old fix for this toggled the whole track's mode off
+// and back on a frame later (via requestAnimationFrame) - that's expensive (forces
+// the browser to reconsider the entire track, not just the visible cue) and, under
+// heavy main-thread load from the Whisper/translation pipeline, the "wait a frame"
+// part could stall for a long time, making controls feel stuck.
+// This does the same job synchronously and only for the cue(s) actually on screen:
+// removing and re-adding just those cues forces the browser to redraw them with
+// whatever the current ::cue style / cue text is, with no delay and no flicker of
+// unrelated cues.
 function refreshCueRendering() {
-  if (!currentTrack) return;
-  currentTrack.mode = 'hidden';
-  requestAnimationFrame(() => {
-    currentTrack.mode = subtitlesEnabled ? 'showing' : 'hidden';
-  });
+  if (!currentTrack || !subtitlesEnabled) return;
+  const active = Array.from(currentTrack.activeCues || []);
+  for (const cue of active) {
+    currentTrack.removeCue(cue);
+    currentTrack.addCue(cue);
+  }
 }
 
 function setSelectedFile(file, handle) {
@@ -950,8 +952,8 @@ fsPlayPauseBtn.addEventListener('click', () => {
 fsSubtitlesBtn.addEventListener('click', () => {
   if (!currentTrack) return;
   subtitlesEnabled = !subtitlesEnabled;
+  currentTrack.mode = subtitlesEnabled ? 'showing' : 'hidden';
   fsSubtitlesBtn.classList.toggle('off', !subtitlesEnabled);
-  refreshCueRendering();
 });
 
 fsOriginalBtn.addEventListener('click', () => {
