@@ -1,6 +1,6 @@
 const CACHE_NAME = 'vsub-shell-v2';
 const SHARED_FILE_CACHE = 'vsub-shared-file-v1';
-const SHELL_FILES = ['./index.html', './manifest.json'];
+const SHELL_FILES = ['./index.html', './manifest.json', './transcribe-worker.js'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

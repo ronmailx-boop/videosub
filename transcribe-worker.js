@@ -1,0 +1,60 @@
+// Runs the whole Whisper pipeline (model load + inference) in a dedicated worker
+// thread, separate from the UI thread. WASM inference is single-threaded and
+// blocks whatever thread it runs on for the full duration of each chunk - keeping
+// it here means the main thread (video, buttons, controls) never freezes while a
+// chunk is being transcribed, no matter how long that chunk takes.
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+env.allowLocalModels = false;
+env.useBrowserCache = true;
+
+let transcriber = null;
+
+async function loadTranscriber(modelName) {
+  const opts = {
+    progress_callback: (data) => {
+      if (data.status === 'progress' && data.total) {
+        self.postMessage({ type: 'progress', pct: Math.round((data.loaded / data.total) * 100) });
+      }
+    }
+  };
+  // Try WebGPU first for a big speed boost on supported phones/browsers.
+  // WebGPU is accessible from dedicated workers on Chromium, same as on the main thread.
+  if (self.navigator.gpu) {
+    try {
+      transcriber = await pipeline('automatic-speech-recognition', modelName, { ...opts, device: 'webgpu' });
+      return 'gpu';
+    } catch (e) {
+      console.warn('[worker] WebGPU pipeline failed, falling back to CPU/WASM', e);
+    }
+  }
+  transcriber = await pipeline('automatic-speech-recognition', modelName, opts);
+  return 'cpu';
+}
+
+self.addEventListener('message', async (event) => {
+  const msg = event.data;
+
+  if (msg.type === 'load') {
+    try {
+      const device = await loadTranscriber(msg.modelName);
+      self.postMessage({ type: 'ready', device });
+    } catch (e) {
+      self.postMessage({ type: 'load-error', message: (e && e.message) || String(e) });
+    }
+    return;
+  }
+
+  if (msg.type === 'transcribe') {
+    const { id, audio, chunkSec } = msg;
+    try {
+      if (!transcriber) throw new Error('Transcriber not loaded yet');
+      const result = await transcriber(audio, { chunk_length_s: chunkSec, stride_length_s: 3 });
+      const text = (result && result.text) ? result.text.trim() : '';
+      self.postMessage({ type: 'result', id, text });
+    } catch (e) {
+      self.postMessage({ type: 'transcribe-error', id, message: (e && e.message) || String(e) });
+    }
+    return;
+  }
+});

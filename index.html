@@ -380,10 +380,6 @@
 </div>
 
 <script type="module">
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-
-env.allowLocalModels = false;
-env.useBrowserCache = true;
 
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
@@ -729,28 +725,55 @@ async function translateToHebrew(text) {
   }
 }
 
-async function loadTranscriber(modelName, onProgress) {
-  const opts = {
-    progress_callback: (data) => {
-      if (data.status === 'progress' && data.total) {
-        onProgress(Math.round((data.loaded / data.total) * 100));
+// ---- Transcription runs in a dedicated Web Worker, not on the main thread ----
+// Whisper inference (via WASM, and to some extent WebGPU glue code) blocks whatever
+// thread it runs on for the whole duration of each chunk. Running it here on the
+// main thread meant the video, the play/pause/CC/font-size buttons, and every other
+// control froze for as long as a chunk took to process. Moving it to a worker keeps
+// the UI thread completely free the whole time.
+const transcribeWorker = new Worker('transcribe-worker.js', { type: 'module' });
+let transcribeReqId = 0;
+
+function loadTranscriber(modelName, onProgress) {
+  return new Promise((resolve, reject) => {
+    const handler = (event) => {
+      const msg = event.data;
+      if (msg.type === 'progress') {
+        onProgress(msg.pct);
+      } else if (msg.type === 'ready') {
+        transcribeWorker.removeEventListener('message', handler);
+        resolve(msg.device); // 'gpu' or 'cpu'
+      } else if (msg.type === 'load-error') {
+        transcribeWorker.removeEventListener('message', handler);
+        reject(new Error(msg.message));
       }
-    }
-  };
-  // Try WebGPU first for a big speed boost on supported phones/browsers.
-  if (navigator.gpu) {
-    try {
-      const t = await pipeline('automatic-speech-recognition', modelName, { ...opts, device: 'webgpu' });
-      gpuBadge.textContent = 'GPU (מואץ)';
-      gpuBadge.classList.add('gpu');
-      return t;
-    } catch (e) {
-      console.warn('WebGPU pipeline failed, falling back to CPU/WASM', e);
-    }
-  }
-  const t = await pipeline('automatic-speech-recognition', modelName, opts);
-  gpuBadge.textContent = 'CPU';
-  return t;
+    };
+    transcribeWorker.addEventListener('message', handler);
+    transcribeWorker.postMessage({ type: 'load', modelName });
+  });
+}
+
+function transcribeChunk(chunkAudio, chunkSec) {
+  return new Promise((resolve, reject) => {
+    const id = ++transcribeReqId;
+    const handler = (event) => {
+      const msg = event.data;
+      if (msg.id !== id) return;
+      if (msg.type === 'result') {
+        transcribeWorker.removeEventListener('message', handler);
+        resolve(msg.text);
+      } else if (msg.type === 'transcribe-error') {
+        transcribeWorker.removeEventListener('message', handler);
+        reject(new Error(msg.message));
+      }
+    };
+    transcribeWorker.addEventListener('message', handler);
+    // chunkAudio is a subarray VIEW into the one big `samples` buffer for the whole
+    // file - transferring its underlying buffer would detach it for every other
+    // chunk too. Copy it into its own standalone buffer first, then transfer that.
+    const chunkCopy = Float32Array.from(chunkAudio);
+    transcribeWorker.postMessage({ type: 'transcribe', id, audio: chunkCopy, chunkSec }, [chunkCopy.buffer]);
+  });
 }
 
 function showBuffering(msg) {
@@ -779,10 +802,12 @@ startBtn.addEventListener('click', async () => {
     setStatus(s2, 'active');
     const modelName = modelSelect.value;
 
-    const [transcriber, audioData] = await Promise.all([
+    const [device, audioData] = await Promise.all([
       loadTranscriber(modelName, (pct) => { p1.style.width = pct + '%'; }),
       selectedFile.arrayBuffer().then(decodeAndResample)
     ]);
+    gpuBadge.textContent = device === 'gpu' ? 'GPU (מואץ)' : 'CPU';
+    gpuBadge.classList.toggle('gpu', device === 'gpu');
     setStatus(s1, 'done');
     setStatus(s2, 'done');
 
@@ -830,9 +855,9 @@ startBtn.addEventListener('click', async () => {
 
       bgStatusText.textContent = `מעבד קדימה: ${i + 1}/${totalChunks} קטעים`;
 
-      let result;
+      let text;
       try {
-        result = await transcriber(chunkAudio, { chunk_length_s: chunkSec, stride_length_s: 3 });
+        text = await transcribeChunk(chunkAudio, chunkSec);
       } catch (e) {
         console.error('Transcribe chunk failed', e);
         processedUntilSec = chunkEndTime;
@@ -840,7 +865,6 @@ startBtn.addEventListener('click', async () => {
         continue;
       }
 
-      const text = (result && result.text) ? result.text.trim() : '';
       if (text) {
         const hebrew = await translateToHebrew(text);
         const cue = new VTTCue(chunkStartTime, chunkEndTime, showingOriginal ? text : hebrew);
