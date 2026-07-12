@@ -236,6 +236,8 @@
     font-size:19px; cursor:pointer;
   }
   .fs-btn#fsSubtitlesBtn{ font-size:13px; font-weight:700; }
+  .fs-btn#fsOriginalBtn{ font-size:12px; font-weight:700; }
+  .fs-btn#fsOriginalBtn.active{ background: var(--accent); color:#08131f; }
   .fs-btn.off{ opacity:.4; }
   .fs-btn-text{ font-size:14px; font-weight:700; width:40px; height:40px; }
   .fs-zoom-label{
@@ -315,6 +317,7 @@
           <button class="fs-btn" id="fsExitBtn" title="יציאה ממסך מלא">✕</button>
           <button class="fs-btn" id="fsPlayPauseBtn" title="נגן/השהה">⏸</button>
           <button class="fs-btn" id="fsSubtitlesBtn" title="כתוביות">CC</button>
+          <button class="fs-btn" id="fsOriginalBtn" title="הצג טקסט מקור באנגלית">EN</button>
           <button class="fs-btn" id="fsRotateBtn" title="סובב מסך">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
           </button>
@@ -379,6 +382,8 @@ let processedUntilSec = 0;
 let currentTrack = null;
 let processingDone = false;
 let waitingForTranscript = false;
+let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translated text
+let showingOriginal = false;
 
 dropzone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
@@ -571,7 +576,9 @@ startBtn.addEventListener('click', async () => {
       const text = (result && result.text) ? result.text.trim() : '';
       if (text) {
         const hebrew = await translateToHebrew(text);
-        track.addCue(new VTTCue(chunkStartTime, chunkEndTime, hebrew));
+        const cue = new VTTCue(chunkStartTime, chunkEndTime, showingOriginal ? text : hebrew);
+        track.addCue(cue);
+        cueRecords.push({ cue, en: text, he: hebrew });
         vtt += `${cueIndex}\n${toVttTime(chunkStartTime)} --> ${toVttTime(chunkEndTime)}\n${hebrew}\n\n`;
         cueIndex++;
       }
@@ -627,6 +634,7 @@ const fsTextSizeMinusBtn = document.getElementById('fsTextSizeMinusBtn');
 const fsTextSizePlusBtn = document.getElementById('fsTextSizePlusBtn');
 const fsPlayPauseBtn = document.getElementById('fsPlayPauseBtn');
 const fsSubtitlesBtn = document.getElementById('fsSubtitlesBtn');
+const fsOriginalBtn = document.getElementById('fsOriginalBtn');
 const fsRotateBtn = document.getElementById('fsRotateBtn');
 const fsSeekBar = document.getElementById('fsSeekBar');
 const fsCurrentTime = document.getElementById('fsCurrentTime');
@@ -666,6 +674,26 @@ fsSubtitlesBtn.addEventListener('click', () => {
   } else {
     currentTrack.mode = 'showing';
     fsSubtitlesBtn.classList.remove('off');
+  }
+});
+
+fsOriginalBtn.addEventListener('click', () => {
+  showingOriginal = !showingOriginal;
+  fsOriginalBtn.textContent = showingOriginal ? 'עב' : 'EN';
+  fsOriginalBtn.classList.toggle('active', showingOriginal);
+  fsOriginalBtn.title = showingOriginal ? 'חזרה לתרגום בעברית' : 'הצג טקסט מקור באנגלית';
+  cueRecords.forEach(rec => {
+    rec.cue.text = showingOriginal ? rec.en : rec.he;
+  });
+  // Chrome on Android sometimes only applies cue text changes to the *next* cue,
+  // not the one currently on screen - force an immediate refresh (same trick used
+  // for the subtitle font-size control below).
+  if (currentTrack) {
+    const prevMode = currentTrack.mode;
+    currentTrack.mode = 'hidden';
+    requestAnimationFrame(() => {
+      currentTrack.mode = prevMode === 'hidden' ? 'showing' : prevMode;
+    });
   }
 });
 
