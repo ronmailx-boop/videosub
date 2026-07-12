@@ -425,6 +425,18 @@ let subtitlesEnabled = true; // single source of truth for whether captions shou
 // removing and re-adding just those cues forces the browser to redraw them with
 // whatever the current ::cue style / cue text is, with no delay and no flicker of
 // unrelated cues.
+//
+// It's ALSO combined with a whole-track mode toggle. Turns out the scoped
+// remove/re-add above is reliable during a fresh transcription (where the
+// background processing loop is constantly touching the DOM - progress bar,
+// status text - every second or two, and that ongoing activity happens to
+// prompt the browser to repaint the caption box too) but NOT reliable when
+// playing a video loaded straight from history: nothing else on the page is
+// mid-repaint, so the scoped fix can be computed internally but never actually
+// get flushed to the screen. Toggling the whole track's mode forces a repaint
+// unconditionally, independent of anything else happening on the page. This is
+// safe to combine now (previously CC also used a mode-toggle here, which could
+// race against this one - it no longer does, see fsSubtitlesBtn below).
 function refreshCueRendering() {
   if (!currentTrack || !subtitlesEnabled) return;
   const active = Array.from(currentTrack.activeCues || []);
@@ -432,6 +444,10 @@ function refreshCueRendering() {
     currentTrack.removeCue(cue);
     currentTrack.addCue(cue);
   }
+  currentTrack.mode = 'hidden';
+  requestAnimationFrame(() => {
+    currentTrack.mode = subtitlesEnabled ? 'showing' : 'hidden';
+  });
 }
 
 function setSelectedFile(file, handle) {
