@@ -415,39 +415,20 @@ let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translat
 let showingOriginal = false;
 let subtitlesEnabled = true; // single source of truth for whether captions should be visible
 
-// Chrome sometimes only applies ::cue style/text changes to the *next* cue, not the
-// one currently on screen. The old fix for this toggled the whole track's mode off
-// and back on a frame later (via requestAnimationFrame) - that's expensive (forces
-// the browser to reconsider the entire track, not just the visible cue) and, under
-// heavy main-thread load from the Whisper/translation pipeline, the "wait a frame"
-// part could stall for a long time, making controls feel stuck.
-// This does the same job synchronously and only for the cue(s) actually on screen:
-// removing and re-adding just those cues forces the browser to redraw them with
-// whatever the current ::cue style / cue text is, with no delay and no flicker of
-// unrelated cues.
-//
-// It's ALSO combined with a whole-track mode toggle. Turns out the scoped
-// remove/re-add above is reliable during a fresh transcription (where the
-// background processing loop is constantly touching the DOM - progress bar,
-// status text - every second or two, and that ongoing activity happens to
-// prompt the browser to repaint the caption box too) but NOT reliable when
-// playing a video loaded straight from history: nothing else on the page is
-// mid-repaint, so the scoped fix can be computed internally but never actually
-// get flushed to the screen. Toggling the whole track's mode forces a repaint
-// unconditionally, independent of anything else happening on the page. This is
-// safe to combine now (previously CC also used a mode-toggle here, which could
-// race against this one - it no longer does, see fsSubtitlesBtn below).
+// Chrome sometimes only applies ::cue style changes to the *next* cue, not the
+// one currently on screen. Earlier versions of this function tried to force a
+// repaint by removing+re-adding the active cue and/or toggling the whole
+// track's mode off and back on. Under repeated/rapid button presses those
+// turned out to occasionally make cues disappear from the track PERMANENTLY -
+// a much worse problem than the cosmetic "size doesn't update instantly" issue
+// they were meant to fix. This version never touches the cues or the track's
+// mode at all - it only forces the browser to recompute styles by reading a
+// layout property, which is the standard side-effect-free way to flush a
+// stylesheet change to the screen. It's less certain to force an *instant*
+// visual update in every situation, but it cannot lose captions.
 function refreshCueRendering() {
   if (!currentTrack || !subtitlesEnabled) return;
-  const active = Array.from(currentTrack.activeCues || []);
-  for (const cue of active) {
-    currentTrack.removeCue(cue);
-    currentTrack.addCue(cue);
-  }
-  currentTrack.mode = 'hidden';
-  requestAnimationFrame(() => {
-    currentTrack.mode = subtitlesEnabled ? 'showing' : 'hidden';
-  });
+  void video.offsetHeight; // force a style/layout recalculation, no side effects
 }
 
 function setSelectedFile(file, handle) {
