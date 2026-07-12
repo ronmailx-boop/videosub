@@ -248,6 +248,24 @@
     color:#fff; font-size:13px; background:rgba(255,255,255,.14);
     padding:6px 12px; border-radius:20px;
   }
+
+  .history-item{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:10px 4px; border-top:1px solid var(--line); cursor:pointer;
+  }
+  .history-item:first-child{ border-top:none; }
+  .history-item:active{ background: var(--panel-2); }
+  .history-item-info{ display:flex; flex-direction:column; gap:2px; overflow:hidden; min-width:0; }
+  .history-item-name{
+    font-size:13.5px; color:var(--text); white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .history-item-meta{ font-size:11.5px; color:var(--muted); }
+  .history-delete-btn{
+    background:none; border:none; color:var(--muted); font-size:17px;
+    padding:6px 8px; cursor:pointer; flex-shrink:0; line-height:1;
+  }
+  .history-delete-btn:active{ color:var(--err); }
 </style>
 </head>
 <body>
@@ -259,6 +277,13 @@
     <div class="sub">תרגום אנגלית ← עברית, מקומי בדפדפן</div>
   </div>
 </header>
+
+<div class="card hidden" id="historyCard">
+  <div class="row" style="margin-bottom:6px;">
+    <label style="color:var(--text); font-weight:700; font-size:14.5px;">היסטוריית סרטונים שהושלמו</label>
+  </div>
+  <div id="historyList"></div>
+</div>
 
 <div class="card" id="uploadCard">
   <div class="dropzone" id="dropzone">
@@ -351,6 +376,7 @@
   דרך WebGPU אם הדפדפן תומך בזה (יופיע תג "GPU" ליד הנגן). הצפייה מתחילה כמעט מיד: הנגן מעבד קדימה ברקע,
   ורק עוצר לרגע אם הצפייה "משיגה" קטע שעוד לא תורגם - ואז ממשיך אוטומטית כשמוכן.
   התרגום לעברית משתמש ב-Google Translate. בפעם הראשונה יש הורדה של מודל התמלול (כמה עשרות MB) - מומלץ ברשת WiFi.
+  סרטונים שהושלמו נשמרים בהיסטוריה מקומית בדפדפן (רק הכתוביות - לא הווידאו עצמו), וניתן לפתוח אותם שוב מאותה תיקייה בלחיצה אחת.
 </div>
 
 <script type="module">
@@ -365,6 +391,8 @@ const filenameEl = document.getElementById('filename');
 const startBtn = document.getElementById('startBtn');
 const modelSelect = document.getElementById('modelSelect');
 const chunkSelect = document.getElementById('chunkSelect');
+const historyCard = document.getElementById('historyCard');
+const historyList = document.getElementById('historyList');
 
 const progressCard = document.getElementById('progressCard');
 const s1 = document.getElementById('s1'), p1 = document.getElementById('p1');
@@ -381,6 +409,7 @@ const downloadVttBtn = document.getElementById('downloadVtt');
 const resetBtn = document.getElementById('resetBtn');
 
 let selectedFile = null;
+let selectedFileHandle = null; // FileSystemFileHandle, when available - lets us reopen the same file later without storing it
 let lastVttText = '';
 let processedUntilSec = 0;
 let currentTrack = null;
@@ -389,14 +418,37 @@ let waitingForTranscript = false;
 let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translated text
 let showingOriginal = false;
 
-dropzone.addEventListener('click', () => fileInput.click());
+function setSelectedFile(file, handle) {
+  if (!file) return;
+  selectedFile = file;
+  selectedFileHandle = handle || null;
+  filenameEl.textContent = '📹 ' + file.name;
+  filenameEl.classList.remove('hidden');
+  startBtn.disabled = false;
+  startBtn.textContent = 'התחל תמלול ותרגום';
+}
+
+dropzone.addEventListener('click', async () => {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'קובצי וידאו', accept: { 'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'] } }],
+        multiple: false
+      });
+      const file = await handle.getFile();
+      setSelectedFile(file, handle);
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // user cancelled the picker
+      console.warn('showOpenFilePicker failed, falling back to <input type=file>', e);
+    }
+  }
+  fileInput.click();
+});
+
 fileInput.addEventListener('change', () => {
   if (fileInput.files && fileInput.files[0]) {
-    selectedFile = fileInput.files[0];
-    filenameEl.textContent = '📹 ' + selectedFile.name;
-    filenameEl.classList.remove('hidden');
-    startBtn.disabled = false;
-    startBtn.textContent = 'התחל תמלול ותרגום';
+    setSelectedFile(fileInput.files[0], null);
   }
 });
 
@@ -405,7 +457,7 @@ resetBtn.addEventListener('click', () => location.reload());
 async function trySharedFile() {
   const params = new URLSearchParams(location.search);
   if (params.get('shared') !== '1') return;
-  history.replaceState(null, '', location.pathname);
+  window.history.replaceState(null, '', location.pathname);
   try {
     const cache = await caches.open('vsub-shared-file-v1');
     const res = await cache.match('/shared-video');
@@ -414,16 +466,206 @@ async function trySharedFile() {
     const originalName = rawName ? decodeURIComponent(rawName) : 'סרטון משותף';
     const blob = await res.blob();
     await cache.delete('/shared-video');
-    selectedFile = new File([blob], originalName, { type: blob.type || 'video/mp4' });
-    filenameEl.textContent = '📹 ' + originalName;
-    filenameEl.classList.remove('hidden');
-    startBtn.disabled = false;
-    startBtn.textContent = 'התחל תמלול ותרגום';
+    setSelectedFile(new File([blob], originalName, { type: blob.type || 'video/mp4' }), null);
   } catch (e) {
     console.error('Could not load shared file', e);
   }
 }
 trySharedFile();
+
+// ---- Completed-videos history (IndexedDB) ----
+// We never store the video file itself - only the finished VTT/cues, plus (when
+// available) a FileSystemFileHandle that lets us reopen the exact same file from
+// its original location later, without asking the user to pick it again.
+const HISTORY_DB_NAME = 'vsub-history-db';
+const HISTORY_STORE = 'videos';
+
+function openHistoryDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(HISTORY_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(HISTORY_STORE)) {
+        db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveHistoryEntry(entry) {
+  const db = await openHistoryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HISTORY_STORE, 'readwrite');
+    tx.objectStore(HISTORY_STORE).put(entry);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getAllHistoryEntries() {
+  const db = await openHistoryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HISTORY_STORE, 'readonly');
+    const req = tx.objectStore(HISTORY_STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteHistoryEntry(id) {
+  const db = await openHistoryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HISTORY_STORE, 'readwrite');
+    tx.objectStore(HISTORY_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Fingerprint a file (no content hashing - just name/size/lastModified) so the
+// same video re-transcribed later updates its existing history row instead of
+// duplicating it.
+function fileFingerprint(file) {
+  return `${file.name}::${file.size}::${file.lastModified}`;
+}
+
+function formatHistoryDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function renderHistory() {
+  let entries = [];
+  try {
+    entries = await getAllHistoryEntries();
+  } catch (e) {
+    console.warn('Could not read history', e);
+  }
+  entries.sort((a, b) => b.completedAt - a.completedAt);
+  historyList.innerHTML = '';
+  if (!entries.length) {
+    historyCard.classList.add('hidden');
+    return;
+  }
+  historyCard.classList.remove('hidden');
+  for (const entry of entries) {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    const info = document.createElement('div');
+    info.className = 'history-item-info';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'history-item-name';
+    nameEl.textContent = '📹 ' + entry.name;
+    const metaEl = document.createElement('div');
+    metaEl.className = 'history-item-meta';
+    const durationLabel = entry.durationSec ? formatTime(entry.durationSec) + ' · ' : '';
+    metaEl.textContent = durationLabel + formatHistoryDate(entry.completedAt);
+    info.append(nameEl, metaEl);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'history-delete-btn';
+    delBtn.title = 'הסר מההיסטוריה';
+    delBtn.textContent = '🗑';
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm(`להסיר את "${entry.name}" מרשימת ההיסטוריה?\nהסרטון עצמו לא יימחק - רק הכתוביות השמורות יוסרו.`)) {
+        try {
+          await deleteHistoryEntry(entry.id);
+        } catch (err) {
+          console.error('Failed to delete history entry', err);
+        }
+        renderHistory();
+      }
+    });
+
+    row.addEventListener('click', () => openFromHistory(entry));
+    row.append(info, delBtn);
+    historyList.appendChild(row);
+  }
+}
+
+async function pickVideoFileForHistory() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'קובצי וידאו', accept: { 'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'] } }],
+        multiple: false
+      });
+      return await handle.getFile();
+    } catch (e) {
+      if (e && e.name !== 'AbortError') console.warn(e);
+      return null;
+    }
+  }
+  return new Promise((resolve) => {
+    const tempInput = document.createElement('input');
+    tempInput.type = 'file';
+    tempInput.accept = 'video/*';
+    tempInput.addEventListener('change', () => resolve(tempInput.files[0] || null));
+    tempInput.click();
+  });
+}
+
+async function openFromHistory(entry) {
+  let file = null;
+  if (entry.handle) {
+    try {
+      let perm = await entry.handle.queryPermission({ mode: 'read' });
+      if (perm !== 'granted') perm = await entry.handle.requestPermission({ mode: 'read' });
+      if (perm === 'granted') file = await entry.handle.getFile();
+    } catch (e) {
+      console.warn('Could not reopen file via saved handle', e);
+    }
+  }
+  if (!file) {
+    alert('לא הצלחתי לפתוח את הסרטון אוטומטית (יתכן שהוא הועבר, נמחק, או שההרשאה פגה). בחר את אותו קובץ וידאו שוב כדי להמשיך לצפות עם הכתוביות השמורות.');
+    file = await pickVideoFileForHistory();
+    if (!file) return;
+  }
+  playFromHistory(entry, file);
+}
+
+function playFromHistory(entry, file) {
+  document.getElementById('uploadCard').classList.add('hidden');
+  document.getElementById('optionsCard').classList.add('hidden');
+  historyCard.classList.add('hidden');
+  startBtn.classList.add('hidden');
+  progressCard.classList.add('hidden');
+  playerCard.classList.remove('hidden');
+
+  selectedFile = file;
+  selectedFileHandle = entry.handle || null;
+  lastVttText = entry.vtt || '';
+  processingDone = true;
+  waitingForTranscript = false;
+  processedUntilSec = Infinity;
+  showingOriginal = false;
+  cueRecords = [];
+
+  const track = video.addTextTrack('subtitles', 'עברית', 'he');
+  currentTrack = track;
+  track.mode = 'showing';
+  video.src = URL.createObjectURL(file);
+
+  document.getElementById('playerFilename').textContent = '📹 ' + file.name;
+  document.getElementById('fsFilenameTop').textContent = file.name;
+
+  for (const c of (entry.cues || [])) {
+    const cue = new VTTCue(c.start, c.end, c.he);
+    track.addCue(cue);
+    cueRecords.push({ cue, en: c.en, he: c.he });
+  }
+
+  gpuBadge.textContent = '—';
+  gpuBadge.classList.remove('gpu');
+  bgStatusText.textContent = `נטען מההיסטוריה - ${cueRecords.length} קטעים`;
+  p3.style.width = '100%';
+}
+
+renderHistory();
 
 function setStatus(el, state) {
   el.classList.remove('active', 'done', 'error');
@@ -604,6 +846,22 @@ startBtn.addEventListener('click', async () => {
       video.play().catch(() => {});
     }
     bgStatusText.textContent = `הושלם - ${totalChunks}/${totalChunks} קטעים`;
+
+    try {
+      await saveHistoryEntry({
+        id: fileFingerprint(selectedFile),
+        name: selectedFile.name,
+        size: selectedFile.size,
+        lastModified: selectedFile.lastModified,
+        durationSec: video.duration || 0,
+        completedAt: Date.now(),
+        vtt: vtt,
+        cues: cueRecords.map(r => ({ start: r.cue.startTime, end: r.cue.endTime, en: r.en, he: r.he })),
+        handle: selectedFileHandle || null
+      });
+    } catch (e) {
+      console.warn('Could not save this video to history', e);
+    }
 
   } catch (err) {
     console.error(err);
