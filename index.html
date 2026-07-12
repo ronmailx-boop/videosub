@@ -417,6 +417,24 @@ let processingDone = false;
 let waitingForTranscript = false;
 let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translated text
 let showingOriginal = false;
+let subtitlesEnabled = true; // single source of truth for whether captions should be visible
+
+// Chrome sometimes only applies ::cue style/text changes to the *next* cue, not the
+// one currently on screen. Forcing the track off and back on again fixes that.
+// IMPORTANT: several controls (CC toggle, EN/HE toggle, font size +/-) all need this
+// same refresh, so they must share ONE implementation that always restores the
+// single `subtitlesEnabled` intent - not whatever `currentTrack.mode` happened to be
+// at the moment of the click. Reading `currentTrack.mode` as "the value to restore"
+// is what caused the buttons to occasionally stop responding: if two of these
+// controls were tapped in quick succession, each captured the other's in-flight
+// "hidden" state as its own "previous" value, and the caption could end up stuck.
+function refreshCueRendering() {
+  if (!currentTrack) return;
+  currentTrack.mode = 'hidden';
+  requestAnimationFrame(() => {
+    currentTrack.mode = subtitlesEnabled ? 'showing' : 'hidden';
+  });
+}
 
 function setSelectedFile(file, handle) {
   if (!file) return;
@@ -643,6 +661,7 @@ function playFromHistory(entry, file) {
   waitingForTranscript = false;
   processedUntilSec = Infinity;
   showingOriginal = false;
+  subtitlesEnabled = true;
   cueRecords = [];
 
   const track = video.addTextTrack('subtitles', 'עברית', 'he');
@@ -930,13 +949,9 @@ fsPlayPauseBtn.addEventListener('click', () => {
 
 fsSubtitlesBtn.addEventListener('click', () => {
   if (!currentTrack) return;
-  if (currentTrack.mode === 'showing') {
-    currentTrack.mode = 'hidden';
-    fsSubtitlesBtn.classList.add('off');
-  } else {
-    currentTrack.mode = 'showing';
-    fsSubtitlesBtn.classList.remove('off');
-  }
+  subtitlesEnabled = !subtitlesEnabled;
+  fsSubtitlesBtn.classList.toggle('off', !subtitlesEnabled);
+  refreshCueRendering();
 });
 
 fsOriginalBtn.addEventListener('click', () => {
@@ -947,16 +962,7 @@ fsOriginalBtn.addEventListener('click', () => {
   cueRecords.forEach(rec => {
     rec.cue.text = showingOriginal ? rec.en : rec.he;
   });
-  // Chrome on Android sometimes only applies cue text changes to the *next* cue,
-  // not the one currently on screen - force an immediate refresh (same trick used
-  // for the subtitle font-size control below).
-  if (currentTrack) {
-    const prevMode = currentTrack.mode;
-    currentTrack.mode = 'hidden';
-    requestAnimationFrame(() => {
-      currentTrack.mode = prevMode === 'hidden' ? 'showing' : prevMode;
-    });
-  }
+  refreshCueRendering();
 });
 
 fsRotateBtn.addEventListener('click', async () => {
@@ -1101,16 +1107,7 @@ const cueStyleEl = document.createElement('style');
 document.head.appendChild(cueStyleEl);
 function updateCueFontSize() {
   cueStyleEl.textContent = `video::cue{ font-size:${subtitleFontSize}rem !important; }`;
-  // Chrome on Android sometimes only applies ::cue style changes to the *next* cue,
-  // not the one currently on screen. Force an immediate refresh by briefly toggling
-  // the track off and back on.
-  if (currentTrack) {
-    const prevMode = currentTrack.mode;
-    currentTrack.mode = 'hidden';
-    requestAnimationFrame(() => {
-      currentTrack.mode = prevMode === 'hidden' ? 'showing' : prevMode;
-    });
-  }
+  refreshCueRendering();
 }
 updateCueFontSize();
 
