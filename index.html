@@ -437,20 +437,19 @@ function refreshCueRendering() {
 
 // For cases where refreshCueRendering()'s side-effect-free trick isn't enough
 // (e.g. changing font size while paused on a cue that started a while ago and
-// won't naturally re-trigger for some time), force a real repaint by
-// removing and re-adding ONLY the cue(s) active right now. This is safe
-// (unlike doing it for every cue on the track) because it touches at most
-// the 1-2 cues actually on screen at this instant, and immediately restores
-// them - so there is no window where a cue could be lost.
+// won't naturally re-trigger for some time), force a real repaint. Tried
+// removing+re-adding just the active cue(s) first, but that isn't reliable on
+// every browser engine (this app runs on all kinds of phones/browsers, not
+// just desktop Chrome). The most bulletproof way to force a full re-render of
+// every currently active cue - text AND style - is to flip the track off and
+// back on a frame later. This never removes a cue from the track, so unlike
+// the remove/re-add approach there is zero risk of ever losing a caption.
 function reflowActiveCues() {
   if (!currentTrack) return;
-  const now = video.currentTime;
-  cueRecords.forEach(rec => {
-    const c = rec.cue;
-    if (c.startTime <= now && now <= c.endTime) {
-      currentTrack.removeCue(c);
-      currentTrack.addCue(c);
-    }
+  const wasShowing = subtitlesEnabled;
+  currentTrack.mode = 'hidden';
+  requestAnimationFrame(() => {
+    currentTrack.mode = wasShowing ? 'showing' : 'hidden';
   });
 }
 
