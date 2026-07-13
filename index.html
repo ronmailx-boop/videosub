@@ -421,14 +421,19 @@ let subtitlesEnabled = true; // single source of truth for whether captions shou
 // track's mode off and back on. Under repeated/rapid button presses those
 // turned out to occasionally make cues disappear from the track PERMANENTLY -
 // a much worse problem than the cosmetic "size doesn't update instantly" issue
-// they were meant to fix. This version never touches the cues or the track's
-// mode at all - it only forces the browser to recompute styles by reading a
-// layout property, which is the standard side-effect-free way to flush a
-// stylesheet change to the screen. It's less certain to force an *instant*
-// visual update in every situation, but it cannot lose captions.
+// they were meant to fix. A plain layout reflow (offsetHeight) turned out not
+// to reach the browser's separate cue-rendering pass at all, so it did nothing.
+// This nudges currentTime by an imperceptible amount and back - the same
+// reconciliation a real seek triggers, which browsers use internally to
+// re-evaluate and repaint active cues against their current style. It never
+// touches cue objects or the track's mode, so it can't lose captions, and the
+// buffering-overlay logic elsewhere in this file only runs while a video is
+// still being transcribed (`!processingDone`), which is never true here.
 function refreshCueRendering() {
   if (!currentTrack || !subtitlesEnabled) return;
-  void video.offsetHeight; // force a style/layout recalculation, no side effects
+  const t = video.currentTime;
+  video.currentTime = Math.max(0, t - 0.001);
+  video.currentTime = t;
 }
 
 function setSelectedFile(file, handle) {
