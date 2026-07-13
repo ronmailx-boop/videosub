@@ -118,6 +118,9 @@
     display:block;
   }
   video::cue{
+    /* Native ::cue rendering is no longer used for the visible caption (see
+       #customCue below) - kept only so nothing looks broken if a cue ever
+       renders natively (e.g. picture-in-picture). */
     font-size: 1.15rem;
     direction: rtl;
     unicode-bidi: plaintext;
@@ -125,6 +128,37 @@
     background: rgba(0,0,0,.6);
     font-family: "Arial Hebrew","Noto Sans Hebrew",-apple-system,Arial,sans-serif;
   }
+
+  /* Custom subtitle overlay - a plain DOM element instead of the native
+     ::cue pseudo-element. Chrome for Android (and Brave, which shares its
+     engine) does not reliably repaint an already-showing ::cue box when its
+     font-size or text changes, or when the track's mode is toggled - captions
+     could become stuck at the wrong size, stuck showing the wrong language,
+     or even disappear permanently after repeated toggling. A normal DOM
+     element has none of those native-rendering quirks: any style or text
+     change to it is always painted on the next frame, on every browser. */
+  #customCue{
+    position:absolute; left:6%; right:6%; bottom:6%; z-index:5;
+    display:flex; justify-content:center;
+    pointer-events:none;
+    text-align:center;
+  }
+  #customCue span{
+    display:inline-block;
+    max-width:100%;
+    padding:.2em .5em;
+    border-radius:4px;
+    background: rgba(0,0,0,.6);
+    color:#fff;
+    direction: rtl;
+    unicode-bidi: plaintext;
+    line-height:1.4;
+    font-family: "Arial Hebrew","Noto Sans Hebrew",-apple-system,Arial,sans-serif;
+    font-size: 1.15rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .video-wrap.fs-active #customCue{ bottom:12%; }
 
   .hidden{ display:none !important; }
   .note{ font-size:12px; color:var(--muted); line-height:1.6; margin-top:10px; }
@@ -325,6 +359,7 @@
   <div class="filename" id="playerFilename" style="margin-top:0; margin-bottom:10px;"></div>
   <div class="video-wrap" id="videoWrap">
     <video id="video" controls playsinline></video>
+    <div id="customCue" class="hidden"><span id="customCueText"></span></div>
     <div class="buffer-overlay hidden" id="bufferOverlay">
       <div class="spinner"></div>
       <div id="bufferText">מכין את הכתובית הבאה...</div>
@@ -408,50 +443,54 @@ let selectedFile = null;
 let selectedFileHandle = null; // FileSystemFileHandle, when available - lets us reopen the same file later without storing it
 let lastVttText = '';
 let processedUntilSec = 0;
-let currentTrack = null;
 let processingDone = false;
 let waitingForTranscript = false;
-let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translated text
+let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translated text. cue is a VTTCue used purely as a {startTime,endTime} container - it is never attached to a real TextTrack.
 let showingOriginal = false;
 let subtitlesEnabled = true; // single source of truth for whether captions should be visible
+let subtitleFontSize = 1.15; // rem
 
-// Chrome sometimes only applies ::cue style/content changes to the *next*
-// cue, not the one currently on screen - neither a plain text mutation nor a
-// stylesheet update (e.g. font-size) gets painted onto an already-active cue
-// until that cue re-enters the timeline. Earlier versions of this function
-// tried to force a repaint by removing+re-adding the active cue and/or
-// toggling the whole track's mode off and back on. Under repeated/rapid
-// button presses those turned out to occasionally make cues disappear from
-// the track PERMANENTLY - a much worse problem than the cosmetic "doesn't
-// update instantly" issue they were meant to fix. This version never touches
-// the cues or the track's mode at all - it only forces the browser to
-// recompute styles by reading a layout property, which is the standard
-// side-effect-free way to flush a stylesheet change to the screen. It's less
-// certain to force an *instant* visual update in every situation (in
-// particular while paused on a long-running cue), but it cannot lose
-// captions.
-function refreshCueRendering() {
-  if (!currentTrack || !subtitlesEnabled) return;
-  void video.offsetHeight; // force a style/layout recalculation, no side effects
+// ---- Custom subtitle rendering ----
+// Captions used to be rendered via the native <track>/::cue mechanism.
+// Chrome for Android (and Brave, which shares its engine) turned out not to
+// reliably repaint an already-showing ::cue box: changing its font-size or
+// text, or toggling the track's mode off/on to force a refresh, could leave
+// the caption stuck at the wrong size/language, or even make it disappear
+// permanently after repeated toggling. A plain DOM element has none of these
+// native-rendering quirks - any text or style change to it is simply
+// rendered on the next frame, the same as any other webpage content, on
+// every browser. So captions are now driven entirely from cueRecords/video
+// currentTime and painted into a normal <div>, with no native track involved
+// in the visible rendering at all.
+const customCueEl = document.getElementById('customCue');
+const customCueTextEl = document.getElementById('customCueText');
+
+function updateCustomCueDisplay() {
+  if (!subtitlesEnabled || !cueRecords.length) {
+    customCueEl.classList.add('hidden');
+    customCueTextEl.textContent = '';
+    return;
+  }
+  const t = video.currentTime;
+  const rec = cueRecords.find(r => t >= r.cue.startTime && t <= r.cue.endTime);
+  if (!rec) {
+    customCueEl.classList.add('hidden');
+    customCueTextEl.textContent = '';
+    return;
+  }
+  customCueTextEl.textContent = showingOriginal ? rec.en : rec.he;
+  customCueEl.classList.remove('hidden');
 }
 
-// For cases where refreshCueRendering()'s side-effect-free trick isn't enough
-// (e.g. changing font size while paused on a cue that started a while ago and
-// won't naturally re-trigger for some time), force a real repaint. Tried
-// removing+re-adding just the active cue(s) first, but that isn't reliable on
-// every browser engine (this app runs on all kinds of phones/browsers, not
-// just desktop Chrome). The most bulletproof way to force a full re-render of
-// every currently active cue - text AND style - is to flip the track off and
-// back on a frame later. This never removes a cue from the track, so unlike
-// the remove/re-add approach there is zero risk of ever losing a caption.
-function reflowActiveCues() {
-  if (!currentTrack) return;
-  const wasShowing = subtitlesEnabled;
-  currentTrack.mode = 'hidden';
-  requestAnimationFrame(() => {
-    currentTrack.mode = wasShowing ? 'showing' : 'hidden';
-  });
+function updateCueFontSize() {
+  customCueTextEl.style.fontSize = `${subtitleFontSize}rem`;
 }
+updateCueFontSize();
+
+video.addEventListener('timeupdate', updateCustomCueDisplay);
+video.addEventListener('seeked', updateCustomCueDisplay);
+video.addEventListener('play', updateCustomCueDisplay);
+video.addEventListener('pause', updateCustomCueDisplay);
 
 function setSelectedFile(file, handle) {
   if (!file) return;
@@ -680,10 +719,10 @@ function playFromHistory(entry, file) {
   showingOriginal = false;
   subtitlesEnabled = true;
   cueRecords = [];
+  fsSubtitlesBtn.classList.remove('off');
+  fsOriginalBtn.textContent = 'EN';
+  fsOriginalBtn.classList.remove('active');
 
-  const track = video.addTextTrack('subtitles', 'עברית', 'he');
-  currentTrack = track;
-  track.mode = 'showing';
   video.src = URL.createObjectURL(file);
 
   document.getElementById('playerFilename').textContent = '📹 ' + file.name;
@@ -691,9 +730,9 @@ function playFromHistory(entry, file) {
 
   for (const c of (entry.cues || [])) {
     const cue = new VTTCue(c.start, c.end, c.he);
-    track.addCue(cue);
     cueRecords.push({ cue, en: c.en, he: c.he });
   }
+  updateCustomCueDisplay();
 
   gpuBadge.textContent = '—';
   gpuBadge.classList.remove('gpu');
@@ -833,9 +872,6 @@ startBtn.addEventListener('click', async () => {
     const { samples, sampleRate } = audioData;
 
     // Attach video immediately - playback can start right away.
-    const track = video.addTextTrack('subtitles', 'עברית', 'he');
-    currentTrack = track;
-    track.mode = 'showing';
     video.src = URL.createObjectURL(selectedFile);
 
     progressCard.classList.add('hidden');
@@ -886,9 +922,9 @@ startBtn.addEventListener('click', async () => {
 
       if (text) {
         const hebrew = await translateToHebrew(text);
-        const cue = new VTTCue(chunkStartTime, chunkEndTime, showingOriginal ? text : hebrew);
-        track.addCue(cue);
+        const cue = new VTTCue(chunkStartTime, chunkEndTime, hebrew);
         cueRecords.push({ cue, en: text, he: hebrew });
+        updateCustomCueDisplay();
         vtt += `${cueIndex}\n${toVttTime(chunkStartTime)} --> ${toVttTime(chunkEndTime)}\n${hebrew}\n\n`;
         cueIndex++;
       }
@@ -993,10 +1029,9 @@ fsPlayPauseBtn.addEventListener('click', () => {
 });
 
 fsSubtitlesBtn.addEventListener('click', () => {
-  if (!currentTrack) return;
   subtitlesEnabled = !subtitlesEnabled;
-  currentTrack.mode = subtitlesEnabled ? 'showing' : 'hidden';
   fsSubtitlesBtn.classList.toggle('off', !subtitlesEnabled);
+  updateCustomCueDisplay();
 });
 
 fsOriginalBtn.addEventListener('click', () => {
@@ -1005,18 +1040,9 @@ fsOriginalBtn.addEventListener('click', () => {
   fsOriginalBtn.classList.toggle('active', showingOriginal);
   fsOriginalBtn.title = showingOriginal ? 'חזרה לתרגום בעברית' : 'הצג טקסט מקור באנגלית';
 
-  cueRecords.forEach(rec => {
-    rec.cue.text = showingOriginal ? rec.en : rec.he;
-  });
-
-  // Mutating an already-active cue's .text does not repaint it - the browser
-  // only redraws a cue's text when the cue (re)enters the timeline. That's
-  // why this button used to need 2-3 presses: the data changed instantly but
-  // the on-screen caption only "caught up" whenever the next cue boundary was
-  // crossed. reflowActiveCues() forces an instant repaint of just what's
-  // visible right now, without touching any cue that isn't currently on screen.
-  reflowActiveCues();
-  refreshCueRendering();
+  // The caption is a plain DOM element updated directly from cueRecords, so
+  // there's no native ::cue rendering to fight with - just repaint immediately.
+  updateCustomCueDisplay();
 });
 
 fsRotateBtn.addEventListener('click', async () => {
@@ -1156,24 +1182,6 @@ fsExitBtn.addEventListener('click', exitFullscreen);
 fsResetZoomBtn.addEventListener('click', resetZoom);
 
 // ---- Subtitle text size control ----
-let subtitleFontSize = 1.15; // rem, matches the default video::cue rule
-const cueStyleEl = document.createElement('style');
-document.head.appendChild(cueStyleEl);
-function updateCueFontSize() {
-  cueStyleEl.textContent = `video::cue{ font-size:${subtitleFontSize}rem !important; }`;
-  // The offsetHeight trick in refreshCueRendering() is usually enough because
-  // in live transcription cues change every few seconds anyway, masking the
-  // problem. When playing a completed video loaded from history, though, the
-  // whole VTT is already loaded up front and the video is very often paused
-  // while the user tests this exact button - with nothing forcing a natural
-  // cue-boundary crossing, the ::cue font-size change wouldn't visibly apply
-  // until playback happened to reach the next cue. reflowActiveCues() forces
-  // the currently-shown cue to redraw immediately with the new size.
-  reflowActiveCues();
-  refreshCueRendering();
-}
-updateCueFontSize();
-
 fsTextSizePlusBtn.addEventListener('click', () => {
   subtitleFontSize = Math.min(2.4, +(subtitleFontSize + 0.15).toFixed(2));
   updateCueFontSize();
