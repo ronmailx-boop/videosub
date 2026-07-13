@@ -415,20 +415,43 @@ let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translat
 let showingOriginal = false;
 let subtitlesEnabled = true; // single source of truth for whether captions should be visible
 
-// Chrome sometimes only applies ::cue style changes to the *next* cue, not the
-// one currently on screen. Earlier versions of this function tried to force a
-// repaint by removing+re-adding the active cue and/or toggling the whole
-// track's mode off and back on. Under repeated/rapid button presses those
-// turned out to occasionally make cues disappear from the track PERMANENTLY -
-// a much worse problem than the cosmetic "size doesn't update instantly" issue
-// they were meant to fix. This version never touches the cues or the track's
-// mode at all - it only forces the browser to recompute styles by reading a
-// layout property, which is the standard side-effect-free way to flush a
-// stylesheet change to the screen. It's less certain to force an *instant*
-// visual update in every situation, but it cannot lose captions.
+// Chrome sometimes only applies ::cue style/content changes to the *next*
+// cue, not the one currently on screen - neither a plain text mutation nor a
+// stylesheet update (e.g. font-size) gets painted onto an already-active cue
+// until that cue re-enters the timeline. Earlier versions of this function
+// tried to force a repaint by removing+re-adding the active cue and/or
+// toggling the whole track's mode off and back on. Under repeated/rapid
+// button presses those turned out to occasionally make cues disappear from
+// the track PERMANENTLY - a much worse problem than the cosmetic "doesn't
+// update instantly" issue they were meant to fix. This version never touches
+// the cues or the track's mode at all - it only forces the browser to
+// recompute styles by reading a layout property, which is the standard
+// side-effect-free way to flush a stylesheet change to the screen. It's less
+// certain to force an *instant* visual update in every situation (in
+// particular while paused on a long-running cue), but it cannot lose
+// captions.
 function refreshCueRendering() {
   if (!currentTrack || !subtitlesEnabled) return;
   void video.offsetHeight; // force a style/layout recalculation, no side effects
+}
+
+// For cases where refreshCueRendering()'s side-effect-free trick isn't enough
+// (e.g. changing font size while paused on a cue that started a while ago and
+// won't naturally re-trigger for some time), force a real repaint by
+// removing and re-adding ONLY the cue(s) active right now. This is safe
+// (unlike doing it for every cue on the track) because it touches at most
+// the 1-2 cues actually on screen at this instant, and immediately restores
+// them - so there is no window where a cue could be lost.
+function reflowActiveCues() {
+  if (!currentTrack) return;
+  const now = video.currentTime;
+  cueRecords.forEach(rec => {
+    const c = rec.cue;
+    if (c.startTime <= now && now <= c.endTime) {
+      currentTrack.removeCue(c);
+      currentTrack.addCue(c);
+    }
+  });
 }
 
 function setSelectedFile(file, handle) {
@@ -983,7 +1006,6 @@ fsOriginalBtn.addEventListener('click', () => {
   fsOriginalBtn.classList.toggle('active', showingOriginal);
   fsOriginalBtn.title = showingOriginal ? 'חזרה לתרגום בעברית' : 'הצג טקסט מקור באנגלית';
 
-  const now = video.currentTime;
   cueRecords.forEach(rec => {
     rec.cue.text = showingOriginal ? rec.en : rec.he;
   });
@@ -992,21 +1014,9 @@ fsOriginalBtn.addEventListener('click', () => {
   // only redraws a cue's text when the cue (re)enters the timeline. That's
   // why this button used to need 2-3 presses: the data changed instantly but
   // the on-screen caption only "caught up" whenever the next cue boundary was
-  // crossed. Removing/re-adding ALL cues to force a redraw was tried before
-  // and occasionally lost cues permanently under rapid clicks, so instead we
-  // only remove+re-add the cue(s) that are active at this exact moment
-  // (normally just one) - this forces an instant repaint of what's visible
-  // right now without touching any cue that isn't currently on screen.
-  if (currentTrack) {
-    cueRecords.forEach(rec => {
-      const c = rec.cue;
-      if (c.startTime <= now && now <= c.endTime) {
-        currentTrack.removeCue(c);
-        currentTrack.addCue(c);
-      }
-    });
-  }
-
+  // crossed. reflowActiveCues() forces an instant repaint of just what's
+  // visible right now, without touching any cue that isn't currently on screen.
+  reflowActiveCues();
   refreshCueRendering();
 });
 
@@ -1152,6 +1162,15 @@ const cueStyleEl = document.createElement('style');
 document.head.appendChild(cueStyleEl);
 function updateCueFontSize() {
   cueStyleEl.textContent = `video::cue{ font-size:${subtitleFontSize}rem !important; }`;
+  // The offsetHeight trick in refreshCueRendering() is usually enough because
+  // in live transcription cues change every few seconds anyway, masking the
+  // problem. When playing a completed video loaded from history, though, the
+  // whole VTT is already loaded up front and the video is very often paused
+  // while the user tests this exact button - with nothing forcing a natural
+  // cue-boundary crossing, the ::cue font-size change wouldn't visibly apply
+  // until playback happened to reach the next cue. reflowActiveCues() forces
+  // the currently-shown cue to redraw immediately with the new size.
+  reflowActiveCues();
   refreshCueRendering();
 }
 updateCueFontSize();
