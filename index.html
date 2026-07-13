@@ -982,9 +982,31 @@ fsOriginalBtn.addEventListener('click', () => {
   fsOriginalBtn.textContent = showingOriginal ? 'עב' : 'EN';
   fsOriginalBtn.classList.toggle('active', showingOriginal);
   fsOriginalBtn.title = showingOriginal ? 'חזרה לתרגום בעברית' : 'הצג טקסט מקור באנגלית';
+
+  const now = video.currentTime;
   cueRecords.forEach(rec => {
     rec.cue.text = showingOriginal ? rec.en : rec.he;
   });
+
+  // Mutating an already-active cue's .text does not repaint it - the browser
+  // only redraws a cue's text when the cue (re)enters the timeline. That's
+  // why this button used to need 2-3 presses: the data changed instantly but
+  // the on-screen caption only "caught up" whenever the next cue boundary was
+  // crossed. Removing/re-adding ALL cues to force a redraw was tried before
+  // and occasionally lost cues permanently under rapid clicks, so instead we
+  // only remove+re-add the cue(s) that are active at this exact moment
+  // (normally just one) - this forces an instant repaint of what's visible
+  // right now without touching any cue that isn't currently on screen.
+  if (currentTrack) {
+    cueRecords.forEach(rec => {
+      const c = rec.cue;
+      if (c.startTime <= now && now <= c.endTime) {
+        currentTrack.removeCue(c);
+        currentTrack.addCue(c);
+      }
+    });
+  }
+
   refreshCueRendering();
 });
 
