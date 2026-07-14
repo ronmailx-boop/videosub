@@ -338,7 +338,7 @@
   <div class="logo">כת</div>
   <div>
     <h1>כתוביות AI</h1>
-    <div class="sub">תרגום אנגלית ← עברית, מקומי בדפדפן</div>
+    <div class="sub" id="headerSub">תרגום אנגלית ← עברית, מקומי בדפדפן</div>
   </div>
 </header>
 
@@ -360,6 +360,14 @@
 </div>
 
 <div class="card" id="optionsCard">
+  <div class="row">
+    <label>שפות תרגום</label>
+    <select id="langPairSelect">
+      <option value="en-he" selected>אנגלית ← עברית</option>
+      <option value="ru-he">רוסית ← עברית</option>
+      <option value="en-ru">אנגלית ← רוסית</option>
+    </select>
+  </div>
   <div class="row">
     <label>דיוק תמלול</label>
     <select id="modelSelect">
@@ -407,7 +415,7 @@
     </button>
     <div class="fs-top-bar hidden" id="fsTopBar">
       <span id="fsFilenameTop"></span>
-      <button class="fs-btn" id="fsOriginalBtn" title="הצג טקסט מקור באנגלית">EN</button>
+      <button class="fs-btn" id="fsOriginalBtn" title="הצג טקסט מקור">EN</button>
     </div>
     <div class="fs-controls hidden" id="fsControls">
       <div class="fs-seek-row">
@@ -448,7 +456,7 @@
   הכל קורה בתוך הדפדפן: הווידאו לא עולה לשום שרת. התמלול (Whisper) רץ מקומית על הטלפון - ומואץ אוטומטית
   דרך WebGPU אם הדפדפן תומך בזה (יופיע תג "GPU" ליד הנגן). הצפייה מתחילה כמעט מיד: הנגן מעבד קדימה ברקע,
   ורק עוצר לרגע אם הצפייה "משיגה" קטע שעוד לא תורגם - ואז ממשיך אוטומטית כשמוכן.
-  התרגום לעברית משתמש ב-Google Translate. בפעם הראשונה יש הורדה של מודל התמלול (כמה עשרות MB) - מומלץ ברשת WiFi.
+  התרגום משתמש ב-Google Translate. בפעם הראשונה יש הורדה של מודל התמלול (כמה עשרות MB) - מומלץ ברשת WiFi. עבור תמלול משפה שאינה אנגלית נדרש מודל תמלול רב-לשוני (הורדה גדולה יותר).
   סרטונים שהושלמו נשמרים בהיסטוריה מקומית בדפדפן (רק הכתוביות - לא הווידאו עצמו), וניתן לפתוח אותם שוב מאותה תיקייה בלחיצה אחת.
 </div>
 
@@ -458,8 +466,63 @@ const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 const filenameEl = document.getElementById('filename');
 const startBtn = document.getElementById('startBtn');
+const langPairSelect = document.getElementById('langPairSelect');
 const modelSelect = document.getElementById('modelSelect');
 const chunkSelect = document.getElementById('chunkSelect');
+const headerSub = document.getElementById('headerSub');
+
+// ---- Language pair configuration ----
+// srcCode/tgtCode feed the Google Translate endpoint (sl/tl params).
+// whisperLanguage is null for English source (the dedicated .en Whisper models
+// only understand English and don't need/accept a language hint), and set to
+// the Whisper language name for any non-English source, which requires the
+// multilingual model variants instead of the .en ones.
+// sourceLabel/targetLabel drive the "show original" toggle button text.
+const LANG_PAIRS = {
+  'en-he': { srcCode: 'en', tgtCode: 'iw', whisperLanguage: null,      multilingual: false, sourceLabel: 'EN', targetLabel: 'עב', headerText: 'תרגום אנגלית ← עברית, מקומי בדפדפן' },
+  'ru-he': { srcCode: 'ru', tgtCode: 'iw', whisperLanguage: 'russian', multilingual: true,  sourceLabel: 'RU', targetLabel: 'עב', headerText: 'תרגום רוסית ← עברית, מקומי בדפדפן' },
+  'en-ru': { srcCode: 'en', tgtCode: 'ru', whisperLanguage: null,      multilingual: false, sourceLabel: 'EN', targetLabel: 'רו', headerText: 'תרגום אנגלית ← רוסית, מקומי בדפדפן' }
+};
+
+// Model choices per accuracy tier. English-source pairs use the lightweight
+// .en-only Whisper builds; any other source language needs the multilingual
+// builds (larger, but able to transcribe more than English).
+const MODEL_VARIANTS = {
+  false: { tiny: 'Xenova/whisper-tiny.en', base: 'Xenova/whisper-base.en', small: 'Xenova/whisper-small.en' },
+  true:  { tiny: 'Xenova/whisper-tiny',    base: 'Xenova/whisper-base',    small: 'Xenova/whisper-small' }
+};
+
+function currentLangPair() {
+  return LANG_PAIRS[langPairSelect.value] || LANG_PAIRS['en-he'];
+}
+
+// Rebuilds the accuracy dropdown's option values for the chosen language pair,
+// while keeping whichever tier (fast/balanced/accurate) was already selected.
+function refreshModelOptions() {
+  const pair = currentLangPair();
+  const variants = MODEL_VARIANTS[pair.multilingual];
+  let currentTier = 'base';
+  for (const opt of modelSelect.options) {
+    if (opt.selected) {
+      if (opt.value.includes('tiny')) currentTier = 'tiny';
+      else if (opt.value.includes('small')) currentTier = 'small';
+      else currentTier = 'base';
+    }
+  }
+  modelSelect.options[0].value = variants.tiny;
+  modelSelect.options[1].value = variants.base;
+  modelSelect.options[2].value = variants.small;
+  modelSelect.value = variants[currentTier];
+}
+
+function refreshLangPairUI() {
+  const pair = currentLangPair();
+  headerSub.textContent = pair.headerText;
+  refreshModelOptions();
+}
+
+langPairSelect.addEventListener('change', refreshLangPairUI);
+refreshLangPairUI();
 const historyCard = document.getElementById('historyCard');
 const historyList = document.getElementById('historyList');
 
@@ -485,6 +548,7 @@ let processingDone = false;
 let waitingForTranscript = false;
 let cueRecords = []; // { cue, en, he } pairs so we can toggle original/translated text. cue is a VTTCue used purely as a {startTime,endTime} container - it is never attached to a real TextTrack.
 let showingOriginal = false;
+let activeLangPair = LANG_PAIRS['en-he']; // language pair used for the session currently on screen
 let subtitlesEnabled = true; // single source of truth for whether captions should be visible
 let subtitleFontSize = 1.15; // rem
 
@@ -755,10 +819,11 @@ function playFromHistory(entry, file) {
   waitingForTranscript = false;
   processedUntilSec = Infinity;
   showingOriginal = false;
+  activeLangPair = LANG_PAIRS['en-he']; // saved history predates per-pair tracking
   subtitlesEnabled = true;
   cueRecords = [];
   fsSubtitlesBtn.classList.remove('off');
-  fsOriginalBtn.textContent = 'EN';
+  fsOriginalBtn.textContent = activeLangPair.sourceLabel;
   fsOriginalBtn.classList.remove('active');
 
   video.src = URL.createObjectURL(file);
@@ -808,16 +873,16 @@ async function decodeAndResample(arrayBuffer) {
   return { samples: rendered.getChannelData(0), duration: decoded.duration, sampleRate: targetRate };
 }
 
-async function translateToHebrew(text) {
+async function translateText(text, srcCode, tgtCode) {
   if (!text || !text.trim()) return '';
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=iw&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${srcCode}&tl=${tgtCode}&dt=t&q=${encodeURIComponent(text)}`;
     const res = await fetch(url);
     const data = await res.json();
     return data[0].map(part => part[0]).join('');
   } catch (e) {
     console.error('Translate failed', e);
-    return text; // fallback: show English if translation fails
+    return text; // fallback: show original-language text if translation fails
   }
 }
 
@@ -849,7 +914,7 @@ function loadTranscriber(modelName, onProgress) {
   });
 }
 
-function transcribeChunk(chunkAudio, chunkSec) {
+function transcribeChunk(chunkAudio, chunkSec, whisperLanguage) {
   return new Promise((resolve, reject) => {
     const id = ++transcribeReqId;
     const handler = (event) => {
@@ -868,7 +933,7 @@ function transcribeChunk(chunkAudio, chunkSec) {
     // file - transferring its underlying buffer would detach it for every other
     // chunk too. Copy it into its own standalone buffer first, then transfer that.
     const chunkCopy = Float32Array.from(chunkAudio);
-    transcribeWorker.postMessage({ type: 'transcribe', id, audio: chunkCopy, chunkSec }, [chunkCopy.buffer]);
+    transcribeWorker.postMessage({ type: 'transcribe', id, audio: chunkCopy, chunkSec, language: whisperLanguage || null }, [chunkCopy.buffer]);
   });
 }
 
@@ -896,6 +961,8 @@ startBtn.addEventListener('click', async () => {
     // Load model + decode audio in parallel so first frame arrives sooner.
     setStatus(s1, 'active');
     setStatus(s2, 'active');
+    const langPair = currentLangPair();
+    activeLangPair = langPair;
     const modelName = modelSelect.value;
 
     const [device, audioData] = await Promise.all([
@@ -950,7 +1017,7 @@ startBtn.addEventListener('click', async () => {
 
       let text;
       try {
-        text = await transcribeChunk(chunkAudio, chunkSec);
+        text = await transcribeChunk(chunkAudio, chunkSec, langPair.whisperLanguage);
       } catch (e) {
         console.error('Transcribe chunk failed', e);
         processedUntilSec = chunkEndTime;
@@ -959,11 +1026,11 @@ startBtn.addEventListener('click', async () => {
       }
 
       if (text) {
-        const hebrew = await translateToHebrew(text);
-        const cue = new VTTCue(chunkStartTime, chunkEndTime, hebrew);
-        cueRecords.push({ cue, en: text, he: hebrew });
+        const translated = await translateText(text, langPair.srcCode, langPair.tgtCode);
+        const cue = new VTTCue(chunkStartTime, chunkEndTime, translated);
+        cueRecords.push({ cue, en: text, he: translated });
         updateCustomCueDisplay();
-        vtt += `${cueIndex}\n${toVttTime(chunkStartTime)} --> ${toVttTime(chunkEndTime)}\n${hebrew}\n\n`;
+        vtt += `${cueIndex}\n${toVttTime(chunkStartTime)} --> ${toVttTime(chunkEndTime)}\n${translated}\n\n`;
         cueIndex++;
       }
 
@@ -1078,9 +1145,9 @@ fsSubtitlesBtn.addEventListener('click', () => {
 
 fsOriginalBtn.addEventListener('click', () => {
   showingOriginal = !showingOriginal;
-  fsOriginalBtn.textContent = showingOriginal ? 'עב' : 'EN';
+  fsOriginalBtn.textContent = showingOriginal ? activeLangPair.targetLabel : activeLangPair.sourceLabel;
   fsOriginalBtn.classList.toggle('active', showingOriginal);
-  fsOriginalBtn.title = showingOriginal ? 'חזרה לתרגום בעברית' : 'הצג טקסט מקור באנגלית';
+  fsOriginalBtn.title = showingOriginal ? 'חזרה לתרגום' : 'הצג טקסט מקור';
 
   // The caption is a plain DOM element updated directly from cueRecords, so
   // there's no native ::cue rendering to fight with - just repaint immediately.

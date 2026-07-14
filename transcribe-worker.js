@@ -46,10 +46,20 @@ self.addEventListener('message', async (event) => {
   }
 
   if (msg.type === 'transcribe') {
-    const { id, audio, chunkSec } = msg;
+    const { id, audio, chunkSec, language } = msg;
     try {
       if (!transcriber) throw new Error('Transcriber not loaded yet');
-      const result = await transcriber(audio, { chunk_length_s: chunkSec, stride_length_s: 3 });
+      const opts = { chunk_length_s: chunkSec, stride_length_s: 3 };
+      // The .en-only Whisper models (used for English source audio) don't take a
+      // language hint - they only ever transcribe English. Multilingual models
+      // (used for any other source language) need language+task passed at
+      // inference time so Whisper knows what it's listening to and to transcribe
+      // rather than translate.
+      if (language) {
+        opts.language = language;
+        opts.task = 'transcribe';
+      }
+      const result = await transcriber(audio, opts);
       const text = (result && result.text) ? result.text.trim() : '';
       self.postMessage({ type: 'result', id, text });
     } catch (e) {
