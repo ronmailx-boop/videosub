@@ -160,6 +160,36 @@
   }
   .video-wrap.fs-active #customCue{ bottom:12%; }
 
+  /* Double-tap seek indicators (fullscreen only, YouTube-style):
+     tapping twice on the right half jumps +10s, left half jumps -10s;
+     each extra tap within the gesture adds another 10s and updates the label. */
+  .seek-indicator{
+    position:absolute; top:0; bottom:0; width:42%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px;
+    opacity:0; pointer-events:none;
+    background: radial-gradient(circle at center, rgba(255,255,255,.14) 0%, rgba(255,255,255,0) 70%);
+    transition: opacity .18s ease;
+    z-index:6;
+  }
+  .seek-indicator.active{ opacity:1; }
+  .seek-indicator-left{ left:0; border-radius: 0 100% 100% 0 / 0 50% 50% 0; }
+  .seek-indicator-right{ right:0; border-radius: 100% 0 0 100% / 50% 0 0 50%; }
+  .seek-indicator-icon{
+    font-size: 2.1rem; color:#fff; letter-spacing:2px;
+    text-shadow: 0 1px 6px rgba(0,0,0,.6);
+  }
+  .seek-indicator.pulse .seek-indicator-icon{ animation: seekPulse .35s ease; }
+  @keyframes seekPulse{
+    0%{ transform: scale(1); }
+    35%{ transform: scale(1.25); }
+    100%{ transform: scale(1); }
+  }
+  .seek-indicator-label{
+    font-size: .95rem; color:#fff; font-weight:600;
+    text-shadow: 0 1px 4px rgba(0,0,0,.6);
+  }
+
   .hidden{ display:none !important; }
   .note{ font-size:12px; color:var(--muted); line-height:1.6; margin-top:10px; }
   .filename{ font-size:13px; color: var(--text); margin-top:10px; word-break:break-all;}
@@ -360,6 +390,14 @@
   <div class="video-wrap" id="videoWrap">
     <video id="video" controls playsinline></video>
     <div id="customCue" class="hidden"><span id="customCueText"></span></div>
+    <div class="seek-indicator seek-indicator-left" id="seekIndicatorLeft">
+      <div class="seek-indicator-icon">◁◁</div>
+      <div class="seek-indicator-label" id="seekIndicatorLabelLeft">10 שניות</div>
+    </div>
+    <div class="seek-indicator seek-indicator-right" id="seekIndicatorRight">
+      <div class="seek-indicator-icon">▷▷</div>
+      <div class="seek-indicator-label" id="seekIndicatorLabelRight">10 שניות</div>
+    </div>
     <div class="buffer-overlay hidden" id="bufferOverlay">
       <div class="spinner"></div>
       <div id="bufferText">מכין את הכתובית הבאה...</div>
@@ -1001,6 +1039,10 @@ const fsRotateBtn = document.getElementById('fsRotateBtn');
 const fsSeekBar = document.getElementById('fsSeekBar');
 const fsCurrentTime = document.getElementById('fsCurrentTime');
 const fsDuration = document.getElementById('fsDuration');
+const seekIndicatorLeft = document.getElementById('seekIndicatorLeft');
+const seekIndicatorRight = document.getElementById('seekIndicatorRight');
+const seekIndicatorLabelLeft = document.getElementById('seekIndicatorLabelLeft');
+const seekIndicatorLabelRight = document.getElementById('seekIndicatorLabelRight');
 
 function formatTime(sec) {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -1204,6 +1246,80 @@ document.addEventListener('webkitfullscreenchange', () => {
 
 let tapStartX = 0, tapStartY = 0, tapStartTime = 0, tapMoved = false, tapWasMultiTouch = false;
 
+// ---- Double-tap seek (YouTube-style, fullscreen only) ----
+// Double-tapping the right half jumps forward 10s, double-tapping the left
+// half jumps back 10s. Extra taps within the same gesture (without pausing)
+// add another 10s each and update the on-screen indicator, exactly like
+// YouTube's seek gesture.
+const SEEK_STEP_SECONDS = 10;
+const DOUBLE_TAP_MS = 300;
+const SEEK_GESTURE_IDLE_MS = 650;
+let seekGestureSide = null;
+let seekGestureTapCount = 0;
+let pendingSingleTapTimer = null;
+let hideSeekIndicatorTimer = null;
+
+function getTapSide(clientX) {
+  const rect = videoWrap.getBoundingClientRect();
+  return (clientX - rect.left) < rect.width / 2 ? 'left' : 'right';
+}
+
+function hideSeekIndicators() {
+  seekIndicatorLeft.classList.remove('active', 'pulse');
+  seekIndicatorRight.classList.remove('active', 'pulse');
+  seekGestureSide = null;
+  seekGestureTapCount = 0;
+}
+
+function showSeekIndicator(side, totalSeconds) {
+  const el = side === 'left' ? seekIndicatorLeft : seekIndicatorRight;
+  const label = side === 'left' ? seekIndicatorLabelLeft : seekIndicatorLabelRight;
+  const other = side === 'left' ? seekIndicatorRight : seekIndicatorLeft;
+  other.classList.remove('active', 'pulse');
+  label.textContent = `${totalSeconds} שניות`;
+  el.classList.remove('pulse');
+  void el.offsetWidth; // restart the pulse animation on every extra tap
+  el.classList.add('active', 'pulse');
+  clearTimeout(hideSeekIndicatorTimer);
+  hideSeekIndicatorTimer = setTimeout(hideSeekIndicators, SEEK_GESTURE_IDLE_MS);
+}
+
+function performSeekStep(side) {
+  seekGestureTapCount++;
+  const delta = side === 'right' ? SEEK_STEP_SECONDS : -SEEK_STEP_SECONDS;
+  const dur = isFinite(video.duration) ? video.duration : Infinity;
+  video.currentTime = Math.min(Math.max(0, video.currentTime + delta), dur);
+  showSeekIndicator(side, seekGestureTapCount * SEEK_STEP_SECONDS);
+}
+
+function handleVideoTap(clientX) {
+  const side = getTapSide(clientX);
+  if (seekGestureSide === side && pendingSingleTapTimer !== null) {
+    // The second tap of a gesture arrived in time - together with the first
+    // tap that's a double-tap, so cancel the "it was just a single tap"
+    // fallback and perform the first 10s seek step.
+    clearTimeout(pendingSingleTapTimer);
+    pendingSingleTapTimer = null;
+    performSeekStep(side);
+  } else if (seekGestureSide === side && seekGestureTapCount > 0) {
+    // Continuing an already-active seek gesture on the same side.
+    performSeekStep(side);
+  } else {
+    // Could be the start of a new gesture, or a genuine single tap - wait
+    // briefly to see if a follow-up tap on the same side arrives before
+    // deciding it was just a tap to show/hide the controls.
+    if (pendingSingleTapTimer) clearTimeout(pendingSingleTapTimer);
+    seekGestureSide = side;
+    seekGestureTapCount = 0;
+    pendingSingleTapTimer = setTimeout(() => {
+      pendingSingleTapTimer = null;
+      seekGestureSide = null;
+      seekGestureTapCount = 0;
+      toggleFsControls();
+    }, DOUBLE_TAP_MS);
+  }
+}
+
 video.addEventListener('touchstart', (e) => {
   if (!videoWrap.classList.contains('fs-active')) return;
   if (e.touches.length === 2) {
@@ -1257,7 +1373,7 @@ video.addEventListener('touchend', (e) => {
     pinchStartDist = 0;
     if (scale <= 1.02) resetZoom();
     if (!tapWasMultiTouch && !tapMoved && (Date.now() - tapStartTime) < 300) {
-      toggleFsControls();
+      handleVideoTap(tapStartX);
     }
     tapWasMultiTouch = false;
   }
