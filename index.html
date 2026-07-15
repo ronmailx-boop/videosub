@@ -312,6 +312,8 @@
   .fs-btn#fsOriginalBtn.active{ background: var(--accent); color:#08131f; }
   .fs-btn#fsCopyBtn{ width:34px; height:34px; }
   .fs-btn#fsCopyBtn.copied{ background: var(--accent); }
+  .fs-btn#fsMuteBtn{ width:34px; height:34px; }
+  .fs-btn#fsMuteBtn.active{ background: var(--accent); }
   .fs-btn.off{ opacity:.4; }
   .fs-btn-text{ font-size:14px; font-weight:700; width:40px; height:40px; }
   .fs-zoom-label{
@@ -425,6 +427,9 @@
         <button class="fs-btn" id="fsOriginalBtn" title="הצג טקסט מקור">EN</button>
         <button class="fs-btn" id="fsCopyBtn" title="העתק">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+        <button class="fs-btn" id="fsMuteBtn" title="השתק אודיו">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 9 8 9 13 4 13 20 8 15 3 15" fill="white" stroke="none"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
         </button>
       </div>
     </div>
@@ -1199,6 +1204,25 @@ async function copyCurrentSubtitleText() {
 }
 
 fsCopyBtn.addEventListener('click', copyCurrentSubtitleText);
+
+const fsMuteBtn = document.getElementById('fsMuteBtn');
+const fsMuteBtnIconOn = fsMuteBtn.innerHTML;
+const fsMuteBtnIconOff = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 9 8 9 13 4 13 20 8 15 3 15" fill="white" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>';
+
+function updateMuteBtnUI() {
+  fsMuteBtn.innerHTML = video.muted ? fsMuteBtnIconOff : fsMuteBtnIconOn;
+  fsMuteBtn.classList.toggle('active', video.muted);
+  fsMuteBtn.title = video.muted ? 'בטל השתקה' : 'השתק אודיו';
+}
+
+fsMuteBtn.addEventListener('click', () => {
+  video.muted = !video.muted;
+  updateMuteBtnUI();
+});
+
+// Keep the button in sync if muted state changes from elsewhere (e.g. native controls).
+video.addEventListener('volumechange', updateMuteBtnUI);
+updateMuteBtnUI();
 
 fsRotateBtn.addEventListener('click', async () => {
   try {
