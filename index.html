@@ -300,12 +300,18 @@
     font-size:19px; cursor:pointer;
   }
   .fs-btn#fsSubtitlesBtn{ font-size:13px; font-weight:700; }
+  .fs-top-row{
+    display:flex; align-items:center; justify-content:center;
+    gap:8px; margin-top:8px;
+  }
   .fs-btn#fsOriginalBtn{
     font-size:12px; font-weight:700;
     width:34px; height:34px;
-    margin:8px auto 0;
+    margin:0;
   }
   .fs-btn#fsOriginalBtn.active{ background: var(--accent); color:#08131f; }
+  .fs-btn#fsCopyBtn{ width:34px; height:34px; }
+  .fs-btn#fsCopyBtn.copied{ background: var(--accent); }
   .fs-btn.off{ opacity:.4; }
   .fs-btn-text{ font-size:14px; font-weight:700; width:40px; height:40px; }
   .fs-zoom-label{
@@ -415,7 +421,12 @@
     </button>
     <div class="fs-top-bar hidden" id="fsTopBar">
       <span id="fsFilenameTop"></span>
-      <button class="fs-btn" id="fsOriginalBtn" title="הצג טקסט מקור">EN</button>
+      <div class="fs-top-row">
+        <button class="fs-btn" id="fsOriginalBtn" title="הצג טקסט מקור">EN</button>
+        <button class="fs-btn" id="fsCopyBtn" title="העתק">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </div>
     </div>
     <div class="fs-controls hidden" id="fsControls">
       <div class="fs-seek-row">
@@ -1102,6 +1113,7 @@ const fsTextSizePlusBtn = document.getElementById('fsTextSizePlusBtn');
 const fsPlayPauseBtn = document.getElementById('fsPlayPauseBtn');
 const fsSubtitlesBtn = document.getElementById('fsSubtitlesBtn');
 const fsOriginalBtn = document.getElementById('fsOriginalBtn');
+const fsCopyBtn = document.getElementById('fsCopyBtn');
 const fsRotateBtn = document.getElementById('fsRotateBtn');
 const fsSeekBar = document.getElementById('fsSeekBar');
 const fsCurrentTime = document.getElementById('fsCurrentTime');
@@ -1153,6 +1165,40 @@ fsOriginalBtn.addEventListener('click', () => {
   // there's no native ::cue rendering to fight with - just repaint immediately.
   updateCustomCueDisplay();
 });
+
+const fsCopyBtnIconHTML = fsCopyBtn.innerHTML;
+let fsCopyBtnResetTimer = null;
+
+async function copyCurrentSubtitleText() {
+  const text = customCueTextEl.textContent || '';
+  if (!text) return;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // Fallback for browsers/contexts without the async Clipboard API.
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    fsCopyBtn.classList.add('copied');
+    fsCopyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>';
+    clearTimeout(fsCopyBtnResetTimer);
+    fsCopyBtnResetTimer = setTimeout(() => {
+      fsCopyBtn.classList.remove('copied');
+      fsCopyBtn.innerHTML = fsCopyBtnIconHTML;
+    }, 1200);
+  } catch (e) {
+    console.warn('Copy failed', e);
+  }
+}
+
+fsCopyBtn.addEventListener('click', copyCurrentSubtitleText);
 
 fsRotateBtn.addEventListener('click', async () => {
   try {
