@@ -338,6 +338,36 @@
     padding:6px 8px; cursor:pointer; flex-shrink:0; line-height:1;
   }
   .history-delete-btn:active{ color:var(--err); }
+
+  .browse-folder-btn{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    width:100%; margin-top:10px; padding:11px;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+    color:var(--muted); font-size:13.5px; font-weight:700; cursor:pointer;
+  }
+  .browse-folder-btn:active{ border-color:var(--accent); color:var(--text); }
+  .folder-search{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+    padding:9px 10px; color:var(--text); font-size:13.5px; margin-bottom:8px;
+  }
+  .folder-search::placeholder{ color:var(--muted); }
+  .folder-path{ font-size:12px; color:var(--accent); margin-bottom:8px; }
+  .folder-item{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 4px; border-top:1px solid var(--line); cursor:pointer;
+  }
+  .folder-item:first-child{ border-top:none; }
+  .folder-item:active{ background:var(--panel-2); }
+  .folder-item-icon{
+    flex-shrink:0; width:30px; height:30px; border-radius:8px;
+    background:rgba(59,167,255,.15); display:flex; align-items:center; justify-content:center; font-size:14px;
+  }
+  .folder-item-info{ min-width:0; flex:1; }
+  .folder-item-name{
+    font-size:13px; color:var(--text); white-space:normal; word-break:break-word; line-height:1.35;
+  }
+  .folder-item-meta{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .folder-empty{ color:var(--muted); font-size:13px; text-align:center; padding:16px 0; }
 </style>
 </head>
 <body>
@@ -365,6 +395,17 @@
   </div>
   <input type="file" id="fileInput" accept="video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v,.3gp,application/octet-stream">
   <div class="filename hidden" id="filename"></div>
+  <div class="browse-folder-btn" id="browseFolderBtn">📁 עיון בתיקייה (רשימה מלאה, ללא חיתוך שמות)</div>
+  <input type="file" id="folderInput" webkitdirectory multiple style="display:none;">
+</div>
+
+<div class="card hidden" id="folderBrowseCard">
+  <div class="row" style="margin-bottom:6px;">
+    <label style="color:var(--text); font-weight:700; font-size:14.5px;">בחירת סרטון מהתיקייה</label>
+  </div>
+  <div class="folder-path" id="folderPath"></div>
+  <input class="folder-search" id="folderSearch" placeholder="חיפוש בתוך התיקייה...">
+  <div id="folderFileList"></div>
 </div>
 
 <div class="card" id="optionsCard">
@@ -643,6 +684,84 @@ fileInput.addEventListener('change', () => {
     setSelectedFile(fileInput.files[0], null);
   }
 });
+
+// ---- Custom folder browser ----
+// Android's native file picker truncates long file/folder names and there is
+// no way to change that (it's OS UI, not ours). As an alternative alongside
+// the regular picker, this lets the person grant access to a whole folder
+// once (via the native folder picker) and then browse its videos in a list
+// we fully control - full names wrap over multiple lines instead of being
+// cut off, and there's a search box to filter by name.
+const browseFolderBtn = document.getElementById('browseFolderBtn');
+const folderInput = document.getElementById('folderInput');
+const folderBrowseCard = document.getElementById('folderBrowseCard');
+const folderPath = document.getElementById('folderPath');
+const folderSearch = document.getElementById('folderSearch');
+const folderFileList = document.getElementById('folderFileList');
+
+let folderVideoFiles = [];
+
+browseFolderBtn.addEventListener('click', () => folderInput.click());
+
+folderInput.addEventListener('change', () => {
+  const files = Array.from(folderInput.files || []);
+  folderVideoFiles = files.filter(f =>
+    /\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i.test(f.name) || f.type.startsWith('video/')
+  );
+
+  const firstPath = files[0]?.webkitRelativePath || '';
+  const folderName = firstPath.split('/')[0] || 'תיקייה נבחרת';
+  folderPath.textContent = '📂 ' + folderName + ' · ' + folderVideoFiles.length + ' סרטונים';
+
+  folderSearch.value = '';
+  renderFolderFileList(folderVideoFiles);
+  folderBrowseCard.classList.remove('hidden');
+  folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+folderSearch.addEventListener('input', () => {
+  const q = folderSearch.value.trim().toLowerCase();
+  renderFolderFileList(folderVideoFiles.filter(f => f.name.toLowerCase().includes(q)));
+});
+
+function renderFolderFileList(files) {
+  folderFileList.innerHTML = '';
+  if (files.length === 0) {
+    folderFileList.innerHTML = '<div class="folder-empty">לא נמצאו סרטונים תואמים</div>';
+    return;
+  }
+  files.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'folder-item';
+
+    const icon = document.createElement('div');
+    icon.className = 'folder-item-icon';
+    icon.textContent = '🎬';
+
+    const info = document.createElement('div');
+    info.className = 'folder-item-info';
+
+    const name = document.createElement('div');
+    name.className = 'folder-item-name';
+    name.textContent = f.name;
+
+    const meta = document.createElement('div');
+    meta.className = 'folder-item-meta';
+    meta.textContent = (f.size / (1024 * 1024)).toFixed(1) + ' MB';
+
+    info.appendChild(name);
+    info.appendChild(meta);
+    row.appendChild(icon);
+    row.appendChild(info);
+
+    row.addEventListener('click', () => {
+      setSelectedFile(f, null);
+      folderBrowseCard.classList.add('hidden');
+    });
+
+    folderFileList.appendChild(row);
+  });
+}
 
 resetBtn.addEventListener('click', () => location.reload());
 
