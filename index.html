@@ -77,6 +77,11 @@
     border:1px solid var(--line);
     border-radius:9px;
     padding:8px 10px;
+    max-width:62%;
+    box-sizing:border-box;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
 
   button.primary{
@@ -436,7 +441,7 @@
       <option value="en-he" selected>אנגלית ← עברית</option>
       <option value="ru-he">רוסית ← עברית</option>
       <option value="en-ru">אנגלית ← רוסית</option>
-      <option value="he-he">עברית → תמלול בעברית (ללא תרגום)</option>
+      <option value="he-he">עברית (תמלול בלבד)</option>
     </select>
   </div>
   <div class="row">
