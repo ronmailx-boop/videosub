@@ -79,6 +79,14 @@ self.addEventListener('message', async (event) => {
         opts.language = language;
         opts.task = 'transcribe';
       }
+      // Beam search instead of plain greedy decoding: at each word Whisper keeps
+      // several candidate continuations in play instead of committing to the
+      // single most likely one immediately, and only picks the best full result
+      // at the end. This is a real accuracy improvement (fewer wrong-word guesses,
+      // especially in a smaller model like "base") that costs time, not memory -
+      // it doesn't load anything extra, so it doesn't carry the crash risk that
+      // switching to a bigger model ("small") does.
+      opts.num_beams = 5;
       const result = await transcriber(audio, opts);
       const text = (result && result.text) ? result.text.trim() : '';
       self.postMessage({ type: 'result', id, text });
