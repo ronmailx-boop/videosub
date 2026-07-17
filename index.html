@@ -396,10 +396,10 @@
 <div class="card" id="uploadCard">
   <div class="dropzone" id="dropzone">
     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8b93a3" stroke-width="1.6"><path d="M12 3v12m0-12 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-    <strong>לחץ לבחירת קובץ וידאו</strong>
-    <span>MP4, MOV או כל פורמט וידאו מהטלפון</span>
+    <strong>לחץ לבחירת קובץ וידאו או אודיו</strong>
+    <span>MP4, MOV, M4A, MP3 או כל פורמט וידאו/אודיו מהטלפון</span>
   </div>
-  <input type="file" id="fileInput" accept="video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v,.3gp,application/octet-stream">
+  <input type="file" id="fileInput" accept="video/*,audio/*,.mp4,.mov,.avi,.mkv,.webm,.m4v,.3gp,.mp3,.m4a,.aac,.wav,.ogg,.oga,.flac,.wma,.opus,.amr,application/octet-stream">
   <div class="filename hidden" id="filename"></div>
   <div class="browse-folder-btn" id="browseFolderBtn">📁 עיון בתיקייה (רשימה מלאה, ללא חיתוך שמות)</div>
   <input type="file" id="folderInput" webkitdirectory multiple style="display:none;">
@@ -436,6 +436,7 @@
       <option value="en-he" selected>אנגלית ← עברית</option>
       <option value="ru-he">רוסית ← עברית</option>
       <option value="en-ru">אנגלית ← רוסית</option>
+      <option value="he-he">עברית → תמלול בעברית (ללא תרגום)</option>
     </select>
   </div>
   <div class="row">
@@ -559,7 +560,8 @@ const headerSub = document.getElementById('headerSub');
 const LANG_PAIRS = {
   'en-he': { srcCode: 'en', tgtCode: 'iw', whisperLanguage: null,      multilingual: false, sourceLabel: 'EN', targetLabel: 'עב', headerText: 'תרגום אנגלית ← עברית, מקומי בדפדפן' },
   'ru-he': { srcCode: 'ru', tgtCode: 'iw', whisperLanguage: 'russian', multilingual: true,  sourceLabel: 'RU', targetLabel: 'עב', headerText: 'תרגום רוסית ← עברית, מקומי בדפדפן' },
-  'en-ru': { srcCode: 'en', tgtCode: 'ru', whisperLanguage: null,      multilingual: false, sourceLabel: 'EN', targetLabel: 'רו', headerText: 'תרגום אנגלית ← רוסית, מקומי בדפדפן' }
+  'en-ru': { srcCode: 'en', tgtCode: 'ru', whisperLanguage: null,      multilingual: false, sourceLabel: 'EN', targetLabel: 'רו', headerText: 'תרגום אנגלית ← רוסית, מקומי בדפדפן' },
+  'he-he': { srcCode: 'he', tgtCode: 'he', whisperLanguage: 'hebrew', multilingual: true,  sourceLabel: 'עב', targetLabel: 'עב', headerText: 'תמלול עברית (ללא תרגום), מקומי בדפדפן', noTranslation: true }
 };
 
 // Model choices per accuracy tier. English-source pairs use the lightweight
@@ -672,11 +674,15 @@ video.addEventListener('seeked', updateCustomCueDisplay);
 video.addEventListener('play', updateCustomCueDisplay);
 video.addEventListener('pause', updateCustomCueDisplay);
 
+function isAudioFile(file) {
+  return file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|oga|flac|wma|opus|amr)$/i.test(file.name);
+}
+
 function setSelectedFile(file, handle) {
   if (!file) return;
   selectedFile = file;
   selectedFileHandle = handle || null;
-  filenameEl.textContent = '📹 ' + file.name;
+  filenameEl.textContent = (isAudioFile(file) ? '🎵 ' : '📹 ') + file.name;
   filenameEl.classList.remove('hidden');
   startBtn.disabled = false;
   startBtn.textContent = 'התחל תמלול ותרגום';
@@ -686,7 +692,7 @@ dropzone.addEventListener('click', async () => {
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'קובצי וידאו', accept: { 'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'] } }],
+        types: [{ description: 'קובצי וידאו/אודיו', accept: { 'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'], 'audio/*': ['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga', '.flac', '.wma', '.opus', '.amr'] } }],
         multiple: false
       });
       const file = await handle.getFile();
@@ -784,12 +790,13 @@ browseFolderBtn.addEventListener('click', () => folderInput.click());
 folderInput.addEventListener('change', () => {
   const files = Array.from(folderInput.files || []);
   folderVideoFiles = files.filter(f =>
-    /\.(mp4|mov|avi|mkv|webm|m4v|3gp)$/i.test(f.name) || f.type.startsWith('video/')
+    /\.(mp4|mov|avi|mkv|webm|m4v|3gp|mp3|m4a|aac|wav|ogg|oga|flac|wma|opus|amr)$/i.test(f.name) ||
+    f.type.startsWith('video/') || f.type.startsWith('audio/')
   );
 
   const firstPath = files[0]?.webkitRelativePath || '';
   const folderName = firstPath.split('/')[0] || 'תיקייה נבחרת';
-  folderPath.textContent = '📂 ' + folderName + ' · ' + folderVideoFiles.length + ' סרטונים';
+  folderPath.textContent = '📂 ' + folderName + ' · ' + folderVideoFiles.length + ' קבצים';
 
   folderSearch.value = '';
   applyFolderFilterAndSort();
@@ -812,7 +819,7 @@ function renderFolderFileList(files) {
 
     const icon = document.createElement('div');
     icon.className = 'folder-item-icon';
-    icon.textContent = '🎬';
+    icon.textContent = isAudioFile(f) ? '🎵' : '🎬';
 
     const info = document.createElement('div');
     info.className = 'folder-item-info';
@@ -978,7 +985,7 @@ async function pickVideoFileForHistory() {
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'קובצי וידאו', accept: { 'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'] } }],
+        types: [{ description: 'קובצי וידאו/אודיו', accept: { 'video/*': ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.3gp'], 'audio/*': ['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga', '.flac', '.wma', '.opus', '.amr'] } }],
         multiple: false
       });
       return await handle.getFile();
@@ -990,7 +997,7 @@ async function pickVideoFileForHistory() {
   return new Promise((resolve) => {
     const tempInput = document.createElement('input');
     tempInput.type = 'file';
-    tempInput.accept = 'video/*';
+    tempInput.accept = 'video/*,audio/*';
     tempInput.addEventListener('change', () => resolve(tempInput.files[0] || null));
     tempInput.click();
   });
@@ -1237,7 +1244,11 @@ startBtn.addEventListener('click', async () => {
       }
 
       if (text) {
-        const translated = await translateText(text, langPair.srcCode, langPair.tgtCode);
+        // For a same-language pair (currently only Hebrew) there's nothing to
+        // translate - skip the Google Translate round-trip entirely and use
+        // the raw transcription as-is. This also means this mode has no
+        // dependency on network access once the model itself is loaded.
+        const translated = langPair.noTranslation ? text : await translateText(text, langPair.srcCode, langPair.tgtCode);
         const cue = new VTTCue(chunkStartTime, chunkEndTime, translated);
         cueRecords.push({ cue, en: text, he: translated });
         updateCustomCueDisplay();
