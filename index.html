@@ -790,7 +790,39 @@ function applyFolderFilterAndSort() {
   renderFolderFileList(sortFolderFiles(filtered));
 }
 
-browseFolderBtn.addEventListener('click', () => folderInput.click());
+browseFolderBtn.addEventListener('click', async () => {
+  if (window.showDirectoryPicker) {
+    try {
+      const dirHandle = await window.showDirectoryPicker();
+      const files = [];
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind !== 'file') continue;
+        if (!/\.(mp4|mov|avi|mkv|webm|m4v|3gp|mp3|m4a|aac|wav|ogg|oga|flac|wma|opus|amr)$/i.test(entry.name)) continue;
+        try {
+          const file = await entry.getFile();
+          // Keep the handle attached to the file so that, if this video later
+          // completes and goes into history, we can reopen the exact same file
+          // automatically - the same way the main "בחירת קובץ" button does.
+          file.__fsHandle = entry;
+          files.push(file);
+        } catch (e) {
+          console.warn('Could not read file from folder', entry.name, e);
+        }
+      }
+      folderVideoFiles = files;
+      folderPath.textContent = '📂 ' + (dirHandle.name || 'תיקייה נבחרת') + ' · ' + folderVideoFiles.length + ' קבצים';
+      folderSearch.value = '';
+      applyFolderFilterAndSort();
+      folderBrowseCard.classList.remove('hidden');
+      folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // user cancelled the picker
+      console.warn('showDirectoryPicker failed, falling back to <input webkitdirectory>', e);
+    }
+  }
+  folderInput.click();
+});
 
 folderInput.addEventListener('change', () => {
   const files = Array.from(folderInput.files || []);
@@ -843,7 +875,7 @@ function renderFolderFileList(files) {
     row.appendChild(info);
 
     row.addEventListener('click', () => {
-      setSelectedFile(f, null);
+      setSelectedFile(f, f.__fsHandle || null);
       folderBrowseCard.classList.add('hidden');
     });
 
