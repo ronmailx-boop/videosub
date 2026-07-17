@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vsub-shell-v4';
+const CACHE_NAME = 'vsub-shell-v5';
 const SHARED_FILE_CACHE = 'vsub-shared-file-v1';
 const SHELL_FILES = ['./index.html', './manifest.json', './transcribe-worker.js'];
 

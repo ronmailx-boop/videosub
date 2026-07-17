@@ -790,25 +790,37 @@ function applyFolderFilterAndSort() {
   renderFolderFileList(sortFolderFiles(filtered));
 }
 
+// Walks a directory and all of its subfolders, collecting matching
+// video/audio files. Needed because course downloads are often organized as
+// a parent folder containing subfolders (e.g. "~Get Your Files Here!") -
+// the old <input webkitdirectory> picker always included nested folders, so
+// this must too, or files one level down never show up.
+async function collectMediaFilesFromDir(dirHandle, out) {
+  for await (const entry of dirHandle.values()) {
+    if (entry.kind === 'directory') {
+      await collectMediaFilesFromDir(entry, out);
+    } else if (entry.kind === 'file') {
+      if (!/\.(mp4|mov|avi|mkv|webm|m4v|3gp|mp3|m4a|aac|wav|ogg|oga|flac|wma|opus|amr)$/i.test(entry.name)) continue;
+      try {
+        const file = await entry.getFile();
+        // Keep the handle attached to the file so that, if this video later
+        // completes and goes into history, we can reopen the exact same file
+        // automatically - the same way the main "בחירת קובץ" button does.
+        file.__fsHandle = entry;
+        out.push(file);
+      } catch (e) {
+        console.warn('Could not read file from folder', entry.name, e);
+      }
+    }
+  }
+}
+
 browseFolderBtn.addEventListener('click', async () => {
   if (window.showDirectoryPicker) {
     try {
       const dirHandle = await window.showDirectoryPicker();
       const files = [];
-      for await (const entry of dirHandle.values()) {
-        if (entry.kind !== 'file') continue;
-        if (!/\.(mp4|mov|avi|mkv|webm|m4v|3gp|mp3|m4a|aac|wav|ogg|oga|flac|wma|opus|amr)$/i.test(entry.name)) continue;
-        try {
-          const file = await entry.getFile();
-          // Keep the handle attached to the file so that, if this video later
-          // completes and goes into history, we can reopen the exact same file
-          // automatically - the same way the main "בחירת קובץ" button does.
-          file.__fsHandle = entry;
-          files.push(file);
-        } catch (e) {
-          console.warn('Could not read file from folder', entry.name, e);
-        }
-      }
+      await collectMediaFilesFromDir(dirHandle, files);
       folderVideoFiles = files;
       folderPath.textContent = '📂 ' + (dirHandle.name || 'תיקייה נבחרת') + ' · ' + folderVideoFiles.length + ' קבצים';
       folderSearch.value = '';
