@@ -364,11 +364,16 @@
   }
   .folder-item-info{ min-width:0; flex:1; }
   .folder-item-name{
-    font-size:13px; color:var(--text); white-space:normal; word-break:break-word; line-height:1.35;
+    font-size: var(--folder-name-size, 13px); color:var(--text); white-space:normal; word-break:break-word; line-height:1.35;
   }
   .folder-item-meta{ font-size:11px; color:var(--muted); margin-top:2px; }
   .folder-empty{ color:var(--muted); font-size:13px; text-align:center; padding:16px 0; }
   select#folderSort{ min-width:118px; padding:9px 8px; }
+  .font-size-btn{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); font-size:12.5px; font-weight:700; padding:5px 10px; cursor:pointer;
+  }
+  .font-size-btn:active{ border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -412,6 +417,14 @@
       <option value="date">תאריך (כרונולוגי)</option>
       <option value="size">גודל</option>
     </select>
+  </div>
+  <div class="row" style="gap:8px; margin-bottom:10px;">
+    <span style="color:var(--muted); font-size:12px;">גודל טקסט</span>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <button type="button" class="font-size-btn" id="folderFontDec">א-</button>
+      <span id="folderFontLabel" style="color:var(--muted); font-size:11px; min-width:28px; text-align:center;">100%</span>
+      <button type="button" class="font-size-btn" id="folderFontInc">א+</button>
+    </div>
   </div>
   <div id="folderFileList"></div>
 </div>
@@ -707,8 +720,37 @@ const folderPath = document.getElementById('folderPath');
 const folderSearch = document.getElementById('folderSearch');
 const folderSort = document.getElementById('folderSort');
 const folderFileList = document.getElementById('folderFileList');
+const folderFontDec = document.getElementById('folderFontDec');
+const folderFontInc = document.getElementById('folderFontInc');
+const folderFontLabel = document.getElementById('folderFontLabel');
 
 let folderVideoFiles = [];
+
+// Font-size control for the folder file name list, remembered between visits.
+const FOLDER_FONT_BASE_PX = 13;
+const FOLDER_FONT_MIN_PCT = 70;
+const FOLDER_FONT_MAX_PCT = 160;
+const FOLDER_FONT_STEP = 10;
+let folderFontPct = parseInt(localStorage.getItem('subtitleAI_folderFontPct') || '100', 10);
+if (isNaN(folderFontPct)) folderFontPct = 100;
+
+function applyFolderFontSize() {
+  folderFontPct = Math.max(FOLDER_FONT_MIN_PCT, Math.min(FOLDER_FONT_MAX_PCT, folderFontPct));
+  const px = (FOLDER_FONT_BASE_PX * folderFontPct / 100).toFixed(1);
+  folderFileList.style.setProperty('--folder-name-size', px + 'px');
+  folderFontLabel.textContent = folderFontPct + '%';
+  localStorage.setItem('subtitleAI_folderFontPct', String(folderFontPct));
+}
+
+folderFontDec.addEventListener('click', () => {
+  folderFontPct -= FOLDER_FONT_STEP;
+  applyFolderFontSize();
+});
+folderFontInc.addEventListener('click', () => {
+  folderFontPct += FOLDER_FONT_STEP;
+  applyFolderFontSize();
+});
+applyFolderFontSize();
 
 // Natural sort (numeric-aware) so "file 2" sorts before "file 10".
 const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
