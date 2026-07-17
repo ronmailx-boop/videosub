@@ -368,6 +368,7 @@
   }
   .folder-item-meta{ font-size:11px; color:var(--muted); margin-top:2px; }
   .folder-empty{ color:var(--muted); font-size:13px; text-align:center; padding:16px 0; }
+  select#folderSort{ min-width:118px; padding:9px 8px; }
 </style>
 </head>
 <body>
@@ -404,7 +405,14 @@
     <label style="color:var(--text); font-weight:700; font-size:14.5px;">בחירת סרטון מהתיקייה</label>
   </div>
   <div class="folder-path" id="folderPath"></div>
-  <input class="folder-search" id="folderSearch" placeholder="חיפוש בתוך התיקייה...">
+  <div class="row" style="gap:8px; margin-bottom:8px;">
+    <input class="folder-search" id="folderSearch" placeholder="חיפוש בתוך התיקייה..." style="margin-bottom:0; flex:1;">
+    <select class="folder-search" id="folderSort" style="margin-bottom:0; width:auto; flex-shrink:0;">
+      <option value="date">תאריך (כרונולוגי)</option>
+      <option value="name">שם (א-ת)</option>
+      <option value="size">גודל</option>
+    </select>
+  </div>
   <div id="folderFileList"></div>
 </div>
 
@@ -697,9 +705,37 @@ const folderInput = document.getElementById('folderInput');
 const folderBrowseCard = document.getElementById('folderBrowseCard');
 const folderPath = document.getElementById('folderPath');
 const folderSearch = document.getElementById('folderSearch');
+const folderSort = document.getElementById('folderSort');
 const folderFileList = document.getElementById('folderFileList');
 
 let folderVideoFiles = [];
+
+// Natural sort (numeric-aware) so "file 2" sorts before "file 10".
+const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+function sortFolderFiles(files) {
+  const sorted = files.slice();
+  const mode = folderSort.value;
+  if (mode === 'name') {
+    sorted.sort((a, b) => naturalCollator.compare(a.name, b.name));
+  } else if (mode === 'size') {
+    sorted.sort((a, b) => a.size - b.size);
+  } else {
+    // 'date' - by file creation/modified time. This is the default because
+    // for course/lesson videos it usually matches the order they were
+    // downloaded in, which tends to line up with the actual 1,2,3... order -
+    // unlike the raw order Android's file system returns them in, which is
+    // arbitrary and not chronological.
+    sorted.sort((a, b) => (a.lastModified || 0) - (b.lastModified || 0));
+  }
+  return sorted;
+}
+
+function applyFolderFilterAndSort() {
+  const q = folderSearch.value.trim().toLowerCase();
+  const filtered = q ? folderVideoFiles.filter(f => f.name.toLowerCase().includes(q)) : folderVideoFiles;
+  renderFolderFileList(sortFolderFiles(filtered));
+}
 
 browseFolderBtn.addEventListener('click', () => folderInput.click());
 
@@ -714,15 +750,13 @@ folderInput.addEventListener('change', () => {
   folderPath.textContent = '📂 ' + folderName + ' · ' + folderVideoFiles.length + ' סרטונים';
 
   folderSearch.value = '';
-  renderFolderFileList(folderVideoFiles);
+  applyFolderFilterAndSort();
   folderBrowseCard.classList.remove('hidden');
   folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
-folderSearch.addEventListener('input', () => {
-  const q = folderSearch.value.trim().toLowerCase();
-  renderFolderFileList(folderVideoFiles.filter(f => f.name.toLowerCase().includes(q)));
-});
+folderSearch.addEventListener('input', applyFolderFilterAndSort);
+folderSort.addEventListener('change', applyFolderFilterAndSort);
 
 function renderFolderFileList(files) {
   folderFileList.innerHTML = '';
