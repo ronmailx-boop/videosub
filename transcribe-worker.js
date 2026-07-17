@@ -10,28 +10,8 @@ env.useBrowserCache = true;
 
 let transcriber = null;
 
-// Surface anything that would otherwise die silently inside the worker (a hard
-// OOM kill of the whole browser process can't be caught by any JS handler -
-// but a "regular" uncaught error/rejection here CAN be, and without these
-// listeners it would just look identical to a crash from the UI's point of
-// view: everything stops with no message).
-self.addEventListener('error', (e) => {
-  self.postMessage({ type: 'worker-error', message: (e && e.message) || 'Unknown worker error' });
-});
-self.addEventListener('unhandledrejection', (e) => {
-  self.postMessage({ type: 'worker-error', message: (e && e.reason && e.reason.message) || String(e.reason) });
-});
-
 async function loadTranscriber(modelName) {
   const opts = {
-    // Force the int8-quantized weights instead of relying on the library
-    // default. The multilingual "small" model in particular is large enough
-    // in full precision (fp32) that loading it on a memory-limited Android
-    // phone can push Chrome over its per-tab memory budget and get the whole
-    // browser killed by the OS - not just the tab, the entire app - with no
-    // JS error at all, since the process is gone before any handler can run.
-    // Quantized weights cut that footprint roughly in half to a third.
-    quantized: true,
     progress_callback: (data) => {
       if (data.status === 'progress' && data.total) {
         self.postMessage({ type: 'progress', pct: Math.round((data.loaded / data.total) * 100) });
@@ -79,14 +59,6 @@ self.addEventListener('message', async (event) => {
         opts.language = language;
         opts.task = 'transcribe';
       }
-      // Beam search instead of plain greedy decoding: at each word Whisper keeps
-      // several candidate continuations in play instead of committing to the
-      // single most likely one immediately, and only picks the best full result
-      // at the end. This is a real accuracy improvement (fewer wrong-word guesses,
-      // especially in a smaller model like "base") that costs time, not memory -
-      // it doesn't load anything extra, so it doesn't carry the crash risk that
-      // switching to a bigger model ("small") does.
-      opts.num_beams = 5;
       const result = await transcriber(audio, opts);
       const text = (result && result.text) ? result.text.trim() : '';
       self.postMessage({ type: 'result', id, text });

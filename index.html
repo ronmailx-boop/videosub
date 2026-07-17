@@ -1118,23 +1118,6 @@ async function translateText(text, srcCode, tgtCode) {
 const transcribeWorker = new Worker('transcribe-worker.js', { type: 'module' });
 let transcribeReqId = 0;
 
-// Surfaces uncaught worker exceptions (e.g. import/module errors) that happen
-// before the worker's own error listeners are even registered. This can NOT
-// catch a hard OOM kill of the whole browser process - if Chrome itself gets
-// killed by Android for using too much memory, the process is gone and no
-// JS anywhere can run - but it does catch genuine JS-level worker crashes,
-// which otherwise looked identical to a full crash from the UI's perspective
-// (everything just stops, with no message at all).
-transcribeWorker.addEventListener('error', (e) => {
-  console.error('Transcribe worker crashed', e);
-  bgStatusText.textContent = 'שגיאה בתהליך התמלול: ' + (e.message || 'התהליך נעצר באופן בלתי צפוי');
-});
-transcribeWorker.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'worker-error') {
-    console.error('Transcribe worker reported an error', event.data.message);
-  }
-});
-
 function loadTranscriber(modelName, onProgress) {
   return new Promise((resolve, reject) => {
     const handler = (event) => {
