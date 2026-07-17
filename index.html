@@ -351,7 +351,7 @@
     padding:9px 10px; color:var(--text); font-size:13.5px; margin-bottom:8px;
   }
   .folder-search::placeholder{ color:var(--muted); }
-  .folder-path{ font-size:12px; color:var(--accent); margin-bottom:8px; }
+  .folder-path{ font-size: var(--folder-name-size, 12px); color:var(--accent); margin-bottom:8px; }
   .folder-item{
     display:flex; align-items:center; gap:10px;
     padding:9px 4px; border-top:1px solid var(--line); cursor:pointer;
@@ -737,7 +737,7 @@ if (isNaN(folderFontPct)) folderFontPct = 100;
 function applyFolderFontSize() {
   folderFontPct = Math.max(FOLDER_FONT_MIN_PCT, Math.min(FOLDER_FONT_MAX_PCT, folderFontPct));
   const px = (FOLDER_FONT_BASE_PX * folderFontPct / 100).toFixed(1);
-  folderFileList.style.setProperty('--folder-name-size', px + 'px');
+  folderBrowseCard.style.setProperty('--folder-name-size', px + 'px');
   folderFontLabel.textContent = folderFontPct + '%';
   localStorage.setItem('subtitleAI_folderFontPct', String(folderFontPct));
 }
