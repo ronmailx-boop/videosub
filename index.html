@@ -925,6 +925,7 @@ backToFolderBtn.addEventListener('click', () => {
   progressCard.classList.add('hidden');
   document.getElementById('uploadCard').classList.remove('hidden');
   document.getElementById('optionsCard').classList.remove('hidden');
+  startBtn.classList.remove('hidden');
   returnToPlayerBtn.classList.toggle('hidden', !hasOpenPlayerSession);
   folderBrowseCard.classList.remove('hidden');
   folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -937,6 +938,7 @@ returnToPlayerBtn.addEventListener('click', () => {
   folderBrowseCard.classList.add('hidden');
   document.getElementById('uploadCard').classList.add('hidden');
   document.getElementById('optionsCard').classList.add('hidden');
+  startBtn.classList.add('hidden');
   playerCard.classList.remove('hidden');
   playerCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
