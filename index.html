@@ -468,6 +468,10 @@
   <div class="status-line" id="s1"><div class="dot"></div><div>טוען מודל תמלול (הורדה חד-פעמית)</div></div>
   <div class="bar"><div id="p1"></div></div>
   <div class="status-line" id="s2" style="margin-top:14px;"><div class="dot"></div><div>מחלץ ומעבד אודיו</div></div>
+  <div class="row" style="margin-top:14px;">
+    <button class="secondary hidden" id="progressBackToFolderBtn">📁 חזרה לרשימת הסרטונים</button>
+    <button class="secondary hidden" id="progressReturnToPlayerBtn">▶️ חזרה לסרטון המתנגן</button>
+  </div>
 </div>
 
 <div class="card hidden" id="playerCard">
@@ -630,6 +634,8 @@ const downloadVttBtn = document.getElementById('downloadVtt');
 const resetBtn = document.getElementById('resetBtn');
 const backToFolderBtn = document.getElementById('backToFolderBtn');
 const returnToPlayerBtn = document.getElementById('returnToPlayerBtn');
+const progressBackToFolderBtn = document.getElementById('progressBackToFolderBtn');
+const progressReturnToPlayerBtn = document.getElementById('progressReturnToPlayerBtn');
 
 let selectedFile = null;
 // True only when the currently-selected video was picked from the folder
@@ -920,7 +926,11 @@ resetBtn.addEventListener('click', () => location.reload());
 // state intact) after opening a video from it, without granting folder
 // access again. Only shown when the currently-open video actually came from
 // that list.
-backToFolderBtn.addEventListener('click', () => {
+// Shared navigation between the folder list, the loading/progress screen,
+// and the player - so the person can jump between "the list", "the video
+// that's currently loading", and "the video that's currently playing" at
+// any point, without losing state or re-picking the folder.
+function showFolderListView() {
   playerCard.classList.add('hidden');
   progressCard.classList.add('hidden');
   document.getElementById('uploadCard').classList.remove('hidden');
@@ -929,19 +939,22 @@ backToFolderBtn.addEventListener('click', () => {
   returnToPlayerBtn.classList.toggle('hidden', !hasOpenPlayerSession);
   folderBrowseCard.classList.remove('hidden');
   folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
+}
 
-// Lets the person jump back to the video that's currently loaded in the
-// player (playing, buffering, or done) after browsing the folder list,
-// without losing that session or re-selecting the file.
-returnToPlayerBtn.addEventListener('click', () => {
+function showPlayerView() {
   folderBrowseCard.classList.add('hidden');
+  progressCard.classList.add('hidden');
   document.getElementById('uploadCard').classList.add('hidden');
   document.getElementById('optionsCard').classList.add('hidden');
   startBtn.classList.add('hidden');
   playerCard.classList.remove('hidden');
   playerCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
+}
+
+backToFolderBtn.addEventListener('click', showFolderListView);
+returnToPlayerBtn.addEventListener('click', showPlayerView);
+progressBackToFolderBtn.addEventListener('click', showFolderListView);
+progressReturnToPlayerBtn.addEventListener('click', showPlayerView);
 
 async function trySharedFile() {
   const params = new URLSearchParams(location.search);
@@ -1271,6 +1284,8 @@ startBtn.addEventListener('click', async () => {
   document.getElementById('optionsCard').classList.add('hidden');
   startBtn.classList.add('hidden');
   progressCard.classList.remove('hidden');
+  progressBackToFolderBtn.classList.toggle('hidden', !openedFromFolderList);
+  progressReturnToPlayerBtn.classList.toggle('hidden', !hasOpenPlayerSession);
 
   try {
     // Load model + decode audio in parallel so first frame arrives sooner.
