@@ -414,6 +414,7 @@
   <div class="row" style="margin-bottom:6px;">
     <label style="color:var(--text); font-weight:700; font-size:14.5px;">בחירת סרטון מהתיקייה</label>
   </div>
+  <button type="button" class="secondary hidden" id="returnToPlayerBtn" style="margin-bottom:10px;">▶️ חזרה לסרטון המתנגן</button>
   <div class="folder-path" id="folderPath"></div>
   <div class="row" style="gap:8px; margin-bottom:8px;">
     <input class="folder-search" id="folderSearch" placeholder="חיפוש בתוך התיקייה..." style="margin-bottom:0; flex:1;">
@@ -628,12 +629,17 @@ const p3 = document.getElementById('p3');
 const downloadVttBtn = document.getElementById('downloadVtt');
 const resetBtn = document.getElementById('resetBtn');
 const backToFolderBtn = document.getElementById('backToFolderBtn');
+const returnToPlayerBtn = document.getElementById('returnToPlayerBtn');
 
 let selectedFile = null;
 // True only when the currently-selected video was picked from the folder
 // browser list, so we know whether it makes sense to offer a "back to the
 // video list" shortcut instead of forcing the person to pick the folder again.
 let openedFromFolderList = false;
+// True once a video is actually loaded into the player (playing, buffering,
+// or fully transcribed), so the folder list can offer a way back to it
+// instead of losing it when the person browses the list.
+let hasOpenPlayerSession = false;
 let selectedFileHandle = null; // FileSystemFileHandle, when available - lets us reopen the same file later without storing it
 let lastVttText = '';
 let processedUntilSec = 0;
@@ -835,6 +841,7 @@ browseFolderBtn.addEventListener('click', async () => {
       folderPath.textContent = '📂 ' + (dirHandle.name || 'תיקייה נבחרת') + ' · ' + folderVideoFiles.length + ' קבצים';
       folderSearch.value = '';
       applyFolderFilterAndSort();
+      returnToPlayerBtn.classList.toggle('hidden', !hasOpenPlayerSession);
       folderBrowseCard.classList.remove('hidden');
       folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
@@ -859,6 +866,7 @@ folderInput.addEventListener('change', () => {
 
   folderSearch.value = '';
   applyFolderFilterAndSort();
+  returnToPlayerBtn.classList.toggle('hidden', !hasOpenPlayerSession);
   folderBrowseCard.classList.remove('hidden');
   folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -917,8 +925,20 @@ backToFolderBtn.addEventListener('click', () => {
   progressCard.classList.add('hidden');
   document.getElementById('uploadCard').classList.remove('hidden');
   document.getElementById('optionsCard').classList.remove('hidden');
+  returnToPlayerBtn.classList.toggle('hidden', !hasOpenPlayerSession);
   folderBrowseCard.classList.remove('hidden');
   folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+// Lets the person jump back to the video that's currently loaded in the
+// player (playing, buffering, or done) after browsing the folder list,
+// without losing that session or re-selecting the file.
+returnToPlayerBtn.addEventListener('click', () => {
+  folderBrowseCard.classList.add('hidden');
+  document.getElementById('uploadCard').classList.add('hidden');
+  document.getElementById('optionsCard').classList.add('hidden');
+  playerCard.classList.remove('hidden');
+  playerCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 async function trySharedFile() {
@@ -1103,6 +1123,7 @@ function playFromHistory(entry, file) {
   progressCard.classList.add('hidden');
   playerCard.classList.remove('hidden');
   backToFolderBtn.classList.toggle('hidden', !openedFromFolderList);
+  hasOpenPlayerSession = true;
 
   selectedFile = file;
   selectedFileHandle = entry.handle || null;
@@ -1274,6 +1295,7 @@ startBtn.addEventListener('click', async () => {
     progressCard.classList.add('hidden');
     playerCard.classList.remove('hidden');
     backToFolderBtn.classList.toggle('hidden', !openedFromFolderList);
+    hasOpenPlayerSession = true;
     document.getElementById('playerFilename').textContent = '📹 ' + selectedFile.name;
     document.getElementById('fsFilenameTop').textContent = selectedFile.name;
     showBuffering('מכין את הכתובית הראשונה...');
