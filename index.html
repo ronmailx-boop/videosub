@@ -534,6 +534,9 @@
     <button class="secondary" id="downloadVtt">הורד קובץ כתוביות (VTT)</button>
     <button class="secondary" id="resetBtn">סרטון חדש</button>
   </div>
+  <div class="row" style="margin-top:8px;">
+    <button class="secondary hidden" id="backToFolderBtn">📁 חזרה לרשימת הסרטונים</button>
+  </div>
 </div>
 
 <div class="note">
@@ -624,8 +627,13 @@ const gpuBadge = document.getElementById('gpuBadge');
 const p3 = document.getElementById('p3');
 const downloadVttBtn = document.getElementById('downloadVtt');
 const resetBtn = document.getElementById('resetBtn');
+const backToFolderBtn = document.getElementById('backToFolderBtn');
 
 let selectedFile = null;
+// True only when the currently-selected video was picked from the folder
+// browser list, so we know whether it makes sense to offer a "back to the
+// video list" shortcut instead of forcing the person to pick the folder again.
+let openedFromFolderList = false;
 let selectedFileHandle = null; // FileSystemFileHandle, when available - lets us reopen the same file later without storing it
 let lastVttText = '';
 let processedUntilSec = 0;
@@ -701,6 +709,7 @@ dropzone.addEventListener('click', async () => {
         multiple: false
       });
       const file = await handle.getFile();
+      openedFromFolderList = false;
       setSelectedFile(file, handle);
       return;
     } catch (e) {
@@ -713,6 +722,7 @@ dropzone.addEventListener('click', async () => {
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files && fileInput.files[0]) {
+    openedFromFolderList = false;
     setSelectedFile(fileInput.files[0], null);
   }
 });
@@ -887,6 +897,7 @@ function renderFolderFileList(files) {
     row.appendChild(info);
 
     row.addEventListener('click', () => {
+      openedFromFolderList = true;
       setSelectedFile(f, f.__fsHandle || null);
       folderBrowseCard.classList.add('hidden');
     });
@@ -896,6 +907,19 @@ function renderFolderFileList(files) {
 }
 
 resetBtn.addEventListener('click', () => location.reload());
+
+// Lets the person return to the same folder's video list (with search/sort
+// state intact) after opening a video from it, without granting folder
+// access again. Only shown when the currently-open video actually came from
+// that list.
+backToFolderBtn.addEventListener('click', () => {
+  playerCard.classList.add('hidden');
+  progressCard.classList.add('hidden');
+  document.getElementById('uploadCard').classList.remove('hidden');
+  document.getElementById('optionsCard').classList.remove('hidden');
+  folderBrowseCard.classList.remove('hidden');
+  folderBrowseCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 async function trySharedFile() {
   const params = new URLSearchParams(location.search);
@@ -1078,6 +1102,7 @@ function playFromHistory(entry, file) {
   startBtn.classList.add('hidden');
   progressCard.classList.add('hidden');
   playerCard.classList.remove('hidden');
+  backToFolderBtn.classList.toggle('hidden', !openedFromFolderList);
 
   selectedFile = file;
   selectedFileHandle = entry.handle || null;
@@ -1248,6 +1273,7 @@ startBtn.addEventListener('click', async () => {
 
     progressCard.classList.add('hidden');
     playerCard.classList.remove('hidden');
+    backToFolderBtn.classList.toggle('hidden', !openedFromFolderList);
     document.getElementById('playerFilename').textContent = '📹 ' + selectedFile.name;
     document.getElementById('fsFilenameTop').textContent = selectedFile.name;
     showBuffering('מכין את הכתובית הראשונה...');
