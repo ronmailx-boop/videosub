@@ -24,11 +24,13 @@
      "name": "<app>",
      "compatibility_date": "<today YYYY-MM-DD>",
      "assets": { "directory": "." },
+     "workers_dev": true,
      "routes": [{ "pattern": "<app>.vplusstudio.app", "custom_domain": true }]
    }
    ```
    - `name`: אותיות קטנות, ספרות ומקפים; קובע את כתובת ה-workers.dev.
    - אתר עם build (Vite/React וכו'): `directory` = תיקיית הפלט (`dist`/`build`). SPA עם ניתוב בצד-לקוח: להוסיף ל-`assets` את `"not_found_handling": "single-page-application"`.
+   - **`"workers_dev": true` חובה כשיש `routes`** — בלי זה wrangler מכבה את הכתובת החינמית `<name>.ronmailx.workers.dev` (קרה ב-EasyPen). כך שתי הכתובות עובדות במקביל.
    - בלי דומיין עדיין: להשמיט את `routes`.
 2. `.assetsignore` (רק כש-`directory` הוא `"."`) — מה **לא** עולה לאתר. להתאים לקבצים של הפרויקט, ולוודא שלא עולה שום דבר פרטי (`.env`, תיעוד פנימי):
    ```
