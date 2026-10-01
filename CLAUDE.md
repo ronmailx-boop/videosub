@@ -2,7 +2,7 @@
 
 ## פריסה ל-Cloudflare ודומיין (כללי — לכל אפליקציה, חדשה או קיימת)
 
-השיטה הקבועה לכל האפליקציות. נבדקה ועובדת (EasyPen, 1.10.2026). כשמבקשים "תעלה ל-Cloudflare" או "תחבר ל-xxx.vplusstudio.app" — פועלים לפי הסעיף הזה.
+השיטה הקבועה לכל האפליקציות. נבדקה ועובדת (EasyPen על תת-דומיין, vplus-studio על הדומיין הראשי — 1.10.2026). כשמבקשים "תעלה ל-Cloudflare" או "תחבר ל-xxx.vplusstudio.app" — פועלים לפי הסעיף הזה.
 
 **עובדות קבועות**
 - חשבון Cloudflare אחד. Account ID (לא סודי): `1c9c1dd0e8a1d80f324b974ae6a617fb`.
@@ -32,6 +32,14 @@
    - אתר עם build (Vite/React וכו'): `directory` = תיקיית הפלט (`dist`/`build`). SPA עם ניתוב בצד-לקוח: להוסיף ל-`assets` את `"not_found_handling": "single-page-application"`.
    - **`"workers_dev": true` חובה כשיש `routes`** — בלי זה wrangler מכבה את הכתובת החינמית `<name>.ronmailx.workers.dev` (קרה ב-EasyPen). כך שתי הכתובות עובדות במקביל.
    - בלי דומיין עדיין: להשמיט את `routes`.
+   - **אתר ראשי של העסק** (כמו vplus-studio) עולה על הדומיין עצמו ולא על תת-דומיין, יחד עם `www`, כדי שמי שמקליד www לא יקבל שגיאה:
+     ```jsonc
+     "routes": [
+       { "pattern": "vplusstudio.app", "custom_domain": true },
+       { "pattern": "www.vplusstudio.app", "custom_domain": true }
+     ]
+     ```
+     רק אתר אחד יכול לתפוס את הדומיין הראשי (`vplusstudio.app` כבר תפוס ע"י vplus-studio); כל אפליקציה מקבלת תת-דומיין `<app>.vplusstudio.app`.
 2. `.assetsignore` (רק כש-`directory` הוא `"."`) — מה **לא** עולה לאתר. להתאים לקבצים של הפרויקט, ולוודא שלא עולה שום דבר פרטי (`.env`, תיעוד פנימי):
    ```
    .git
@@ -94,7 +102,7 @@
    ```
 
 **מה רק המשתמש עושה (פעם אחת לכל ריפו)** — Claude לא יכול להגדיר Secrets:
-1. Cloudflare → My Profile → API Tokens → Create Token → תבנית **Edit Cloudflare Workers** → Account Resources: Include + החשבון → Zone Resources: Include + **Specific zone** → `vplusstudio.app` (אם האפליקציה בדומיין אחר — את הדומיין שלה) → שם לפי הפרויקט (`<app>-deploy`) → Create Token → Copy.
+1. Cloudflare → My Profile → API Tokens → Create Token → תבנית **Edit Cloudflare Workers** → Account Resources: Include + החשבון → Zone Resources: Include + **Specific zone** → `vplusstudio.app` (אם האפליקציה בדומיין אחר — את הדומיין שלה; נבדק ב-vplus-studio: מספיק גם לדומיין הראשי וגם ל-www, בלי הרשאות נוספות) → שם לפי הפרויקט (`<app>-deploy`) → Create Token → Copy.
 2. GitHub → הריפו → Settings → Secrets and variables → Actions → New repository secret → שם `CLOUDFLARE_API_TOKEN`.
 - **מפתח נפרד לכל פרויקט** — ההמלצה המקובלת (מפתח לכל מטרה, לא מפתח-על אחד). זה לא מגביל הרשאות: כל מפתח מהתבנית יכול לשנות כל Worker בחשבון (Cloudflare לא מגביל מפתח ל-Worker אחד). היתרון: מבטלים/מחליפים מפתח שדלף בלי לשבור את הפריסה בריפו אחרים, ולפי השם יודעים מאיפה דלף. מפתחות ישנים עם All zones ממשיכים לעבוד — לא חובה להחליף.
 - **החלפה (Roll)** לפחות פעם בשנה, ומיד בחשד לדליפה: Cloudflare → My Profile → API Tokens → המפתח → Roll → להעתיק → לעדכן את ה-Secret `CLOUDFLARE_API_TOKEN` באותו ריפו.
