@@ -94,9 +94,11 @@
    ```
 
 **מה רק המשתמש עושה (פעם אחת לכל ריפו)** — Claude לא יכול להגדיר Secrets:
-1. Cloudflare → My Profile → API Tokens → Create Token → תבנית **Edit Cloudflare Workers** → Account Resources: Include + החשבון → Zone Resources: Include + **All zones** → שם לפי הפרויקט (`<app>-deploy`) → Create Token → Copy.
+1. Cloudflare → My Profile → API Tokens → Create Token → תבנית **Edit Cloudflare Workers** → Account Resources: Include + החשבון → Zone Resources: Include + **Specific zone** → `vplusstudio.app` (אם האפליקציה בדומיין אחר — את הדומיין שלה) → שם לפי הפרויקט (`<app>-deploy`) → Create Token → Copy.
 2. GitHub → הריפו → Settings → Secrets and variables → Actions → New repository secret → שם `CLOUDFLARE_API_TOKEN`.
-- **מפתח נפרד לכל פרויקט** (דליפה מריפו אחד לא פוגעת באחרים). לעולם לא לבקש להדביק אותו בצ'אט, ולא לשמור בקוד או בקובץ — רק כ-Secret.
+- **מפתח נפרד לכל פרויקט** — ההמלצה המקובלת (מפתח לכל מטרה, לא מפתח-על אחד). זה לא מגביל הרשאות: כל מפתח מהתבנית יכול לשנות כל Worker בחשבון (Cloudflare לא מגביל מפתח ל-Worker אחד). היתרון: מבטלים/מחליפים מפתח שדלף בלי לשבור את הפריסה בריפו אחרים, ולפי השם יודעים מאיפה דלף. מפתחות ישנים עם All zones ממשיכים לעבוד — לא חובה להחליף.
+- **החלפה (Roll)** לפחות פעם בשנה, ומיד בחשד לדליפה: Cloudflare → My Profile → API Tokens → המפתח → Roll → להעתיק → לעדכן את ה-Secret `CLOUDFLARE_API_TOKEN` באותו ריפו.
+- לעולם לא לבקש להדביק אותו בצ'אט, ולא לשמור בקוד או בקובץ — רק כ-Secret.
 - בלי ה-Secret ה-workflow מדלג (לא נכשל) — אפשר למזג את הקבצים לפני שהמשתמש מוסיף אותו.
 
 **אחרי המיזוג — אימות**
