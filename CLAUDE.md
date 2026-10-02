@@ -115,6 +115,33 @@
 - נכשל על הרשאה → להוסיף הרשאה **למפתח הקיים** של הפרויקט, לא ליצור מפתח חדש.
 - דומיין `.app` מחייב HTTPS (HSTS); Cloudflare מטפל בזה.
 
+**כיבוי הכתובת החינמית `workers.dev`** (נבדק בפועל על flydeal, 2.10.2026)
+
+ברירת המחדל (`workers_dev: true`) משאירה את שתי הכתובות פעילות
+במקביל. אם רוצים **רק** את הדומיין המותאם:
+
+1. ב-`wrangler.toml`/`wrangler.jsonc`: `workers_dev: false`.
+2. **חובה גרסת Wrangler 4 ומעלה.** עם Wrangler 3 (גם עם כל ההרשאות
+   הנכונות בטוקן) הפריסה נכשלת באופן עקבי עם
+   `A request to the Cloudflare API (/zones/.../workers/routes) failed.
+   No access to the specified resource.` - זה באג/מגבלה אמיתית
+   בגרסה הישנה בשילוב `custom_domain` + `workers_dev: false`, **לא**
+   בעיית הרשאות (נבדק: 5 טוקנים שונים עם הרשאות מלאות, כולם נכשלו
+   זהה; הבעיה נפתרה מיידית אחרי שדרוג ל-v4). ב-`cloudflare/wrangler-action`:
+   `wranglerVersion: "4"`. בקריאה ישירה (`npx --yes wrangler@4 deploy`,
+   התבנית הסטנדרטית למעלה) - זה כבר תקין.
+3. (לפי תיעוד Cloudflare הרשמי, ליתר ביטחון): לוודא שלטוקן יש גם
+   **Zone → Workers Routes → Edit** (בנוסף ל-Workers Scripts:Edit) -
+   My Profile → API Tokens → הטוקן → Edit → Permissions → Add more.
+4. Push. הלוג אחרי דיפלוי מוצלח יראה **רק** את שורת ה-Custom Domain,
+   בלי שורת workers.dev.
+
+**כיבוי דרך הדשבורד** (ידני, בלי דיפלוי): Worker → Settings →
+Domains & Routes → ליד `workers.dev` → Disable. **אזהרה:** בלי
+`workers_dev: false` גם בקובץ - הדיפלוי הבא יחזיר את workers.dev
+אוטומטית.
+
+
 **אפליקציה עם Service Worker / PWA / אחסון מקומי**
 - Cloudflare מפנה `page.html` → `/page`, ודפדפן מסרב להגיש מהמטמון תגובה מופנית לניווט → האופליין נשבר. כל תגובה לפני `cache.put` עוברת דרך `unredirect`, ובחיפוש ניווט במטמון מנסים גם את גרסת ה-`.html`:
   ```js
